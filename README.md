@@ -61,35 +61,55 @@ While you're there, note your **tailnet name**: open <https://login.tailscale.co
 
 <!-- screenshot: Tailscale DNS page highlighting the tailnet name -->
 
-#### 3b. Paste the Access Control List (ACL)
+#### 3b. Extend the Access Control List (ACL)
 
-Open <https://login.tailscale.com/admin/acls/file>. Replace the entire contents with the snippet below, then click **Save**.
+Open <https://login.tailscale.com/admin/acls/file>. **Don't replace the whole file** — extend the existing one with two additions:
 
-Replace `admin` with the username you'll set in the `USERNAME` GitHub secret (step 5):
+1. A top-level `tagOwners` block declaring the two tags this template uses.
+2. A new entry in the `ssh` array letting the CI runner SSH into the server.
+
+Replace `martin` with the value you'll set in the `USERNAME` GitHub secret (step 5).
+
+For a fresh Tailscale account the default ACL uses the new `grants` format. Add to it like this:
 
 ```hujson
 {
-  "tagOwners": {
-    "tag:server": ["autogroup:admin"],
-    "tag:ci":     ["autogroup:admin"]
-  },
-  "ssh": [
-    {
-      "action": "accept",
-      "src":    ["tag:ci"],
-      "dst":    ["tag:server"],
-      "users":  ["admin", "root"]
-    }
-  ],
-  "acls": [
-    { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:*"] }
-  ]
+    // ADD: declare the tags used by this template.
+    "tagOwners": {
+        "tag:server": ["autogroup:admin"],
+        "tag:ci":     ["autogroup:admin"],
+    },
+
+    // KEEP your existing grants block as-is. The default "*→*" already lets
+    // your CI runner reach the server on any port — no network-ACL change needed.
+    "grants": [
+        {"src": ["*"], "dst": ["*"], "ip": ["*"]},
+    ],
+
+    "ssh": [
+        // KEEP your existing rule(s).
+        {
+            "action": "check",
+            "src":    ["autogroup:member"],
+            "dst":    ["autogroup:self"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+        // ADD: CI runner SSHes into the server non-interactively.
+        {
+            "action": "accept",
+            "src":    ["tag:ci"],
+            "dst":    ["tag:server"],
+            "users":  ["martin", "root"],
+        },
+    ],
 }
 ```
 
-This declares two tags (`tag:server` for your VPS, `tag:ci` for GitHub Actions runs) and lets the CI runner SSH into the server via Tailscale identity. No SSH keys involved.
+If you've previously tightened your ACL (replaced `*→*` with specific rules), make sure `tag:ci` is allowed to reach `tag:server` on at least port 22 — otherwise the deploy workflow's SSH will be blocked.
 
-<!-- screenshot: Tailscale ACL editor with snippet pasted -->
+Click **Save**.
+
+<!-- screenshot: Tailscale ACL editor with the two added blocks highlighted -->
 
 #### 3c. Create the server auth key
 
@@ -177,6 +197,7 @@ Add each row below by clicking **New repository secret**, pasting the exact `Nam
 | `ACME_EMAIL` | Your email | Let's Encrypt sends cert-expiry warnings here. |
 | `TAILNET` | Your tailnet DNS suffix, e.g. `tail1234.ts.net` | From <https://login.tailscale.com/admin/dns> (step 3a). |
 | `USER_SSH_PUBKEY` | Your laptop's SSH **public** key, single line starting with `ssh-ed25519 AAAA...` | Used as emergency fallback access while public SSH is open. See "Where do I get this?" below. |
+| `INITIAL_USER_PASSWORD` | A plaintext password, e.g. `correct-horse-battery-staple` | **Optional but recommended.** Set so you can log in at the Contabo VNC console if SSH ever breaks. Hashed by the workflow with `openssl passwd -6` before being baked in — the plaintext value never reaches the server. Leave unset if you're OK relying solely on SSH key auth. |
 
 The deploy workflow pushes the Cloudflare and Vaultwarden tokens over Tailscale SSH after each rebuild. Files land at `/var/lib/<svc>/...` with mode 0400 root-owned. Tokens never enter `/nix/store`.
 

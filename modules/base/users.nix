@@ -7,6 +7,13 @@
     description = userConfig.username;
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [ userConfig.sshPublicKey ];
+    # Declarative password for VNC console fallback. null = no password (SSH
+    # key only). Hashed by the install/deploy workflow via `openssl passwd -6`
+    # from the INITIAL_USER_PASSWORD GitHub secret.
+    hashedPassword =
+      if userConfig.hashedPassword == ""
+      then null
+      else userConfig.hashedPassword;
   };
 
   # Passwordless sudo for wheel — required for `nixos-rebuild --use-remote-sudo`

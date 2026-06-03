@@ -23,12 +23,13 @@
         if builtins.pathExists ./config.local.nix
         then import ./config.local.nix
         else {
-          hostname     = "myserver";
-          username     = "admin";
-          domain       = "example.com";
-          acmeEmail    = "you@example.com";
-          tailnet      = "tail0000.ts.net";
-          sshPublicKey = "ssh-ed25519 AAAA_PLACEHOLDER you@laptop";
+          hostname       = "myserver";
+          username       = "admin";
+          domain         = "example.com";
+          acmeEmail      = "you@example.com";
+          tailnet        = "tail0000.ts.net";
+          sshPublicKey   = "ssh-ed25519 AAAA_PLACEHOLDER you@laptop";
+          hashedPassword = "";
         };
       userConfig   = base // overrides;
       stateVersion = "24.11";
