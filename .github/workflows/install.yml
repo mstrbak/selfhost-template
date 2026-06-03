@@ -49,14 +49,22 @@ jobs:
           TAILNET:               ${{ secrets.TAILNET }}
           USER_SSH_PUBKEY:       ${{ secrets.USER_SSH_PUBKEY }}
           INITIAL_USER_PASSWORD: ${{ secrets.INITIAL_USER_PASSWORD }}
+          VPS_IP:                ${{ secrets.VPS_IP }}
+          VPS_PREFIX:            ${{ secrets.VPS_PREFIX }}
+          VPS_GATEWAY:           ${{ secrets.VPS_GATEWAY }}
         run: |
           set -eu
-          for var in HOSTNAME USERNAME DOMAIN ACME_EMAIL TAILNET USER_SSH_PUBKEY; do
+          for var in HOSTNAME USERNAME DOMAIN ACME_EMAIL TAILNET USER_SSH_PUBKEY VPS_IP VPS_PREFIX VPS_GATEWAY; do
             if [ -z "${!var}" ]; then
               echo "::error::Required secret $var is not set."
               exit 1
             fi
           done
+          case "$VPS_PREFIX" in
+            ''|*[!0-9]*)
+              echo "::error::VPS_PREFIX must be a positive integer (e.g. 20, 22, 24). Got: $VPS_PREFIX"
+              exit 1 ;;
+          esac
           # Optional VNC fallback password — hash it with SHA-512 crypt (NixOS-compatible).
           if [ -n "${INITIAL_USER_PASSWORD:-}" ]; then
             HASHED_PW=$(openssl passwd -6 "$INITIAL_USER_PASSWORD")
@@ -74,6 +82,9 @@ jobs:
             tailnet        = "$(esc "$TAILNET")";
             sshPublicKey   = "$(esc "$USER_SSH_PUBKEY")";
             hashedPassword = "$(esc "$HASHED_PW")";
+            vpsIp          = "$(esc "$VPS_IP")";
+            vpsPrefix      = ${VPS_PREFIX};
+            vpsGateway     = "$(esc "$VPS_GATEWAY")";
           }
           EOF
           chmod 600 config.local.nix

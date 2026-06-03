@@ -2,7 +2,21 @@
 {
   networking = {
     hostName = userConfig.hostname;
-    useDHCP = lib.mkDefault true;
+    useDHCP = false;
+
+    # Contabo VPSes use static IPv4 assignment; DHCP is not available.
+    # Values come from GH secrets via config.local.nix.
+    interfaces.ens18 = {
+      useDHCP = false;
+      ipv4.addresses = [{
+        address = userConfig.vpsIp;
+        prefixLength = userConfig.vpsPrefix;
+      }];
+    };
+    defaultGateway = userConfig.vpsGateway;
+
+    # Public resolvers — Contabo's own DNS works too but is provider-locked.
+    nameservers = [ "1.1.1.1" "1.0.0.1" ];
 
     firewall = {
       enable = true;

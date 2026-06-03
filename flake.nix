@@ -30,6 +30,9 @@
           tailnet        = "tail0000.ts.net";
           sshPublicKey   = "ssh-ed25519 AAAA_PLACEHOLDER you@laptop";
           hashedPassword = "";
+          vpsIp          = "0.0.0.0";
+          vpsPrefix      = 24;
+          vpsGateway     = "0.0.0.1";
         };
       userConfig   = base // overrides;
       stateVersion = "24.11";

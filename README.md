@@ -36,18 +36,38 @@ Notes on the domain:
 
 ### 1. Fork this repo
 
-### 2. Note your VPS root password and IP
+### 2. Note your VPS root password, IP, prefix, and gateway
 
 After ordering a VPS, Contabo sends two emails:
 
 1. **"Your VPS is ready"** — contains the **IPv4 address** of your server.
 2. **"Your initial root password"** — contains the root password as a plain string.
 
-Open both, copy the IP and the password somewhere temporary (a notes app). You'll paste them into GitHub secrets in step 5.
+Contabo VPSes use **static IPv4 configuration** (no DHCP). You also need the netmask prefix and gateway, which Contabo does not show in the control panel. Easiest way to get them:
 
-<!-- screenshot: Contabo welcome email showing root password field -->
+```bash
+# SSH into the freshly-provisioned Ubuntu VPS as root:
+ssh root@<VPS_IP>
 
-After install, password SSH is disabled and root login is disabled. You can rotate or destroy the original Contabo root password from the Contabo Customer Control Panel afterwards (Your Services → your VPS → "Manage" → "Reset root password").
+# Then:
+ip -4 addr show           # find the /NN after your IP → that's VPS_PREFIX
+ip -4 route               # find "default via X.X.X.X" → that's VPS_GATEWAY
+```
+
+Example output:
+
+```
+inet 157.173.120.172/20 brd 157.173.127.255 scope global eth0
+default via 157.173.112.1 dev eth0
+```
+
+→ `VPS_PREFIX=20`, `VPS_GATEWAY=157.173.112.1`
+
+Copy the IP, prefix, gateway, and root password somewhere temporary. You'll paste them into GitHub secrets in step 5.
+
+<!-- screenshot: Ubuntu shell showing ip -4 addr and ip -4 route output with values highlighted -->
+
+After NixOS install, password SSH is disabled and root login is disabled. You can rotate or destroy the original Contabo root password from the Contabo Customer Control Panel afterwards (Your Services → your VPS → "Manage" → "Reset root password").
 
 ### 3. Tailscale setup
 
@@ -180,6 +200,8 @@ Add each row below by clicking **New repository secret**, pasting the exact `Nam
 | Name | Value | Where it comes from |
 |---|---|---|
 | `VPS_IP` | Your VPS's IPv4 address | Contabo "Your VPS is ready" email (step 2) |
+| `VPS_PREFIX` | IPv4 prefix length, e.g. `20` (a number, not the netmask) | Boot Ubuntu first time, run `ip -4 addr show` — note the `/NN` after your IP. Contabo VPS S/M/L typically use `/20`. |
+| `VPS_GATEWAY` | IPv4 default gateway, e.g. `157.173.112.1` | Same Ubuntu — run `ip -4 route` and copy the `default via X.X.X.X` value. **Not necessarily** `<your IP>.1` on Contabo. |
 | `VPS_ROOT_PASSWORD` | The root password string | Contabo "Your initial root password" email (step 2) |
 | `TAILSCALE_AUTHKEY` | `tskey-auth-...` | Auth key generated in step 3c |
 | `TAILSCALE_OAUTH_CLIENT_ID` | Looks like `k1234...` | OAuth client ID from step 3d |
