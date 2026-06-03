@@ -15,94 +15,207 @@ Fork → edit `config.nix` → set repo secrets → trigger the install workflow
 
 ## Prerequisites
 
-- A Contabo VPS, Ubuntu pre-installed (tested on the **200 GB SSD** KVM plan — disk `/dev/sda`). NVMe plans may expose `/dev/vda` or `/dev/nvme0n1`; you'll edit one line in `config.nix`.
-- A Tailscale account
-- A domain managed by **Cloudflare** (for DNS-01 ACME)
-- A GitHub account
+You'll need accounts on four services. All four have free tiers that work for this template (Contabo VPS costs ~€7/month).
+
+| Service | What it does | Sign up |
+|---|---|---|
+| **GitHub** | Hosts your fork and runs the install/deploy workflows | <https://github.com/signup> |
+| **Contabo** | Provides the VPS (Ubuntu pre-installed) | <https://contabo.com/en/vps/> — order any **VPS S/M/L** plan, **200 GB SSD** is what's tested |
+| **Tailscale** | Private network ("tailnet") between your laptop, your server, and the CI runner | <https://login.tailscale.com/start> — free tier covers up to 3 users / 100 devices |
+| **Cloudflare** | DNS provider for your domain. Used to obtain Let's Encrypt certs (DNS-01 challenge) | <https://dash.cloudflare.com/sign-up>; transfer or add your domain following Cloudflare's onboarding |
+
+Notes on the VPS:
+- Tested on Contabo **VPS S 200 GB SSD** (KVM, disk `/dev/sda`)
+- Contabo NVMe plans may expose `/dev/vda` or `/dev/nvme0n1` — you'll edit one line in `config.nix`
+- During order, select **Ubuntu 24.04 LTS** as the OS template. The exact Ubuntu version doesn't matter — `nixos-anywhere` wipes it anyway.
+
+Notes on the domain:
+- You need a domain you control. If you don't have one, register one anywhere (Namecheap, Porkbun, etc.) and point its nameservers at Cloudflare. Cloudflare's free plan is enough.
 
 ## Setup
 
 ### 1. Fork this repo
 
-### 2. Note your VPS root password
+### 2. Note your VPS root password and IP
 
-Contabo emails you the root password once at provisioning. You'll paste it into a GitHub secret in step 5 — no local SSH commands needed.
+After ordering a VPS, Contabo sends two emails:
 
-After install, password SSH is disabled. Rotate or destroy the original Contabo root password afterwards if you want.
+1. **"Your VPS is ready"** — contains the **IPv4 address** of your server.
+2. **"Your initial root password"** — contains the root password as a plain string.
+
+Open both, copy the IP and the password somewhere temporary (a notes app). You'll paste them into GitHub secrets in step 5.
+
+<!-- screenshot: Contabo welcome email showing root password field -->
+
+After install, password SSH is disabled and root login is disabled. You can rotate or destroy the original Contabo root password from the Contabo Customer Control Panel afterwards (Your Services → your VPS → "Manage" → "Reset root password").
 
 ### 3. Tailscale setup
 
-- **Auth key** (admin console → Settings → Keys): create a **reusable**, **pre-approved**, **non-ephemeral** key. Tag it `tag:server`. This key is baked into your server at install time.
-- **OAuth client** (admin console → Settings → OAuth clients): create a client with scope `devices:write`, tag `tag:ci`. Used by the deploy workflow to spin up an ephemeral runner node.
-- **Tailscale ACL** (admin console → Access Controls): paste the snippet below. It declares the tags and lets the CI runner SSH into your server via Tailscale identity — no SSH keys needed.
+After creating your Tailscale account, you'll do three things in the admin console at <https://login.tailscale.com/admin>: paste an ACL, create a server auth key, and create a CI OAuth client.
 
-  Replace `admin` with the `username` you'll set in `config.nix`:
+#### 3a. Install Tailscale on your laptop
 
-  ```hujson
-  {
-    "tagOwners": {
-      "tag:server": ["autogroup:admin"],
-      "tag:ci":     ["autogroup:admin"]
-    },
-    "ssh": [
-      {
-        "action": "accept",
-        "src":    ["tag:ci"],
-        "dst":    ["tag:server"],
-        "users":  ["admin", "root"]
-      }
-    ],
-    "acls": [
-      { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:*"] }
-    ]
-  }
-  ```
+You'll need it to reach your server after install. Download from <https://tailscale.com/download> and log in. Verify with `tailscale status` in a terminal.
 
-### 4. Cloudflare API token
+While you're there, note your **tailnet name**: open <https://login.tailscale.com/admin/dns> and look at the top of the page — you'll see something like `tail1234.ts.net`. You'll paste this into `config.nix` in step 6.
 
-Cloudflare dashboard → My Profile → API Tokens → Create:
-- Permission: `Zone:DNS:Edit`
-- Zone Resources: include your domain only
+<!-- screenshot: Tailscale DNS page highlighting the tailnet name -->
 
-### 5. Add GitHub Actions secrets
+#### 3b. Paste the Access Control List (ACL)
 
-In your fork → Settings → Secrets and variables → Actions:
+Open <https://login.tailscale.com/admin/acls/file>. Replace the entire contents with the snippet below, then click **Save**.
 
-| Secret | Purpose |
-|---|---|
-| `VPS_IP` | Your VPS public IP. Also used to confirm disk wipes. |
-| `VPS_ROOT_PASSWORD` | Contabo root password from the welcome email. Used by the install workflow only; after install, password SSH is disabled. |
-| `TAILSCALE_AUTHKEY` | The reusable auth key from step 3. |
-| `TAILSCALE_OAUTH_CLIENT_ID` | OAuth client ID from step 3. |
-| `TAILSCALE_OAUTH_SECRET` | OAuth client secret from step 3. |
-| `CLOUDFLARE_DNS_API_TOKEN` | The Cloudflare token from step 4. The deploy workflow pushes it to `/var/lib/traefik/cf-token` on the server. |
-| `VAULTWARDEN_ADMIN_TOKEN` | **Argon2-hashed** Vaultwarden admin token. Generate with `docker run --rm -it vaultwarden/server /vaultwarden hash` and paste the resulting `$argon2id$...` string. Leave unset if you don't use Vaultwarden's admin panel. |
+Replace `admin` with the `username` you'll set in `config.nix`:
 
-The deploy workflow pushes these tokens over Tailscale SSH after each rebuild. Files land at `/var/lib/<svc>/...` with mode 0400 root-owned. Tokens never enter `/nix/store`.
-
-### 6. Edit `config.nix`
-
-```nix
+```hujson
 {
-  hostname = "myserver";
-  username = "admin";
-  domain    = "example.com";
-  acmeEmail = "you@example.com";
-  tailnet   = "tail1234.ts.net";     # your tailnet's DNS suffix
-  diskDevice = "/dev/sda";
-  timeZone = "Europe/Bratislava";
-  sshPublicKey = "ssh-ed25519 AAAA... you@laptop";   # YOUR laptop's pubkey (~/.ssh/id_ed25519.pub) — emergency fallback access
-  publicSshFallback = true;          # leave true until lockdown step
+  "tagOwners": {
+    "tag:server": ["autogroup:admin"],
+    "tag:ci":     ["autogroup:admin"]
+  },
+  "ssh": [
+    {
+      "action": "accept",
+      "src":    ["tag:ci"],
+      "dst":    ["tag:server"],
+      "users":  ["admin", "root"]
+    }
+  ],
+  "acls": [
+    { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:*"] }
+  ]
 }
 ```
 
-Commit and push.
+This declares two tags (`tag:server` for your VPS, `tag:ci` for GitHub Actions runs) and lets the CI runner SSH into the server via Tailscale identity. No SSH keys involved.
+
+<!-- screenshot: Tailscale ACL editor with snippet pasted -->
+
+#### 3c. Create the server auth key
+
+Open <https://login.tailscale.com/admin/settings/keys>. Click **Generate auth key…**. Configure:
+
+- **Reusable**: ON (allows reinstalls)
+- **Ephemeral**: OFF (server stays in the tailnet across reboots)
+- **Pre-approved**: ON
+- **Tags**: select `tag:server`
+- **Expiration**: any (the key is only used during install)
+
+Click **Generate key**. **Copy it now** — it's shown only once. This goes into the `TAILSCALE_AUTHKEY` GitHub secret.
+
+<!-- screenshot: Tailscale auth key creation dialog with the toggles set -->
+
+#### 3d. Create the CI OAuth client
+
+Open <https://login.tailscale.com/admin/settings/oauth>. Click **Generate OAuth client…**. Configure:
+
+- **Description**: e.g. "GitHub Actions deploy"
+- **Scopes**: check `Devices > Core > Write` (this is what `devices:write` means in the Tailscale docs)
+- **Tags**: select `tag:ci`
+
+Click **Generate client**. You'll see a **Client ID** and a **Client secret**. Copy both — the secret is shown only once. These go into the `TAILSCALE_OAUTH_CLIENT_ID` and `TAILSCALE_OAUTH_SECRET` GitHub secrets.
+
+<!-- screenshot: Tailscale OAuth client creation dialog -->
+
+### 4. Cloudflare API token
+
+Used by Traefik on your server to obtain Let's Encrypt certificates via DNS-01 challenge. The token only needs DNS write access on your one domain.
+
+#### 4a. Confirm your domain is on Cloudflare
+
+Open <https://dash.cloudflare.com/>. If you don't see your domain listed:
+
+1. Click **Add a site**, enter your domain.
+2. Pick the **Free** plan.
+3. Cloudflare shows you two nameservers (e.g. `xxx.ns.cloudflare.com`). Log into your registrar and change your domain's nameservers to those. Propagation takes minutes-to-hours.
+4. Wait until Cloudflare's dashboard shows your domain as **Active**.
+
+#### 4b. Create the API token
+
+Open <https://dash.cloudflare.com/profile/api-tokens>. Click **Create Token** → **Get started** next to "Create Custom Token". Configure:
+
+- **Token name**: e.g. "selfhost-template DNS-01"
+- **Permissions**: add one row
+  - `Zone` / `DNS` / `Edit`
+- **Zone Resources**: `Include` / `Specific zone` / select your domain
+- **Client IP Address Filtering**: leave blank
+- **TTL**: leave blank (no expiration)
+
+Click **Continue to summary** → **Create Token**. Copy the token shown — it's displayed only once. Goes into the `CLOUDFLARE_DNS_API_TOKEN` GitHub secret.
+
+<!-- screenshot: Cloudflare custom token configuration with Zone:DNS:Edit row -->
+
+### 5. Add GitHub Actions secrets
+
+Go to your fork's page on GitHub and navigate:
+
+**Settings** (top tab) → **Secrets and variables** (left sidebar, under Security) → **Actions** → **New repository secret**
+
+Add each row below by clicking **New repository secret**, pasting the exact `Name` and `Secret` value, then **Add secret**.
+
+<!-- screenshot: GitHub repo secrets page with "New repository secret" button highlighted -->
+
+| Name | Value | Where it comes from |
+|---|---|---|
+| `VPS_IP` | Your VPS's IPv4 address | Contabo "Your VPS is ready" email (step 2) |
+| `VPS_ROOT_PASSWORD` | The root password string | Contabo "Your initial root password" email (step 2) |
+| `TAILSCALE_AUTHKEY` | `tskey-auth-...` | Auth key generated in step 3c |
+| `TAILSCALE_OAUTH_CLIENT_ID` | Looks like `k1234...` | OAuth client ID from step 3d |
+| `TAILSCALE_OAUTH_SECRET` | `tskey-client-...` | OAuth client secret from step 3d |
+| `CLOUDFLARE_DNS_API_TOKEN` | The token shown after creation | Cloudflare token from step 4b |
+| `VAULTWARDEN_ADMIN_TOKEN` | An argon2 hash like `$argon2id$v=19$m=...` | **Optional.** Only set if you want Vaultwarden's `/admin` panel enabled. Generate by running `docker run --rm -it vaultwarden/server /vaultwarden hash` on any machine with Docker — enter a password twice, copy the `$argon2id$...` string it prints. |
+
+The deploy workflow pushes the Cloudflare and Vaultwarden tokens over Tailscale SSH after each rebuild. Files land at `/var/lib/<svc>/...` with mode 0400 root-owned. Tokens never enter `/nix/store`.
+
+### 6. Edit `config.nix`
+
+In your fork, open `config.nix` (root of the repo). Edit each value:
+
+```nix
+{
+  hostname = "myserver";              # a short name; appears in Tailscale and shell prompt
+  username = "admin";                 # MUST match the username in your Tailscale ACL (step 3b)
+  domain    = "example.com";          # your Cloudflare-managed domain
+  acmeEmail = "you@example.com";      # used by Let's Encrypt for expiry warnings
+  tailnet   = "tail1234.ts.net";      # from Tailscale DNS page (step 3a)
+  diskDevice = "/dev/sda";            # /dev/sda for Contabo SSD; /dev/vda or /dev/nvme0n1 for some NVMe plans
+  timeZone = "Europe/Bratislava";     # IANA tz name; see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+  sshPublicKey = "ssh-ed25519 AAAA... you@laptop";   # YOUR laptop's pubkey — emergency fallback access
+  publicSshFallback = true;           # leave true until step 12 (lockdown)
+}
+```
+
+#### Where do I get `sshPublicKey`?
+
+On your laptop terminal:
+
+```bash
+# Mac/Linux — create one if you don't have it:
+test -f ~/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -N ''
+
+# Print it:
+cat ~/.ssh/id_ed25519.pub
+```
+
+Paste the entire single line (starts with `ssh-ed25519 AAAA...` and ends with `your-email@your-machine` or similar) into the `sshPublicKey` field.
+
+Commit and push your changes.
 
 ### 7. Run the install workflow
 
-GitHub → Actions → **Install NixOS** → **Run workflow**. You must type the VPS IP exactly into the confirmation field — this guards against accidental disk wipes.
+In your fork on GitHub:
 
-The workflow takes ~10 minutes. When it finishes the server reboots into NixOS and auto-joins Tailscale.
+1. Click the **Actions** tab.
+2. Left sidebar → **Install NixOS (DESTRUCTIVE — wipes the VPS disk)**.
+3. Right side → **Run workflow** dropdown.
+4. In the **"Type your VPS IP exactly to confirm disk wipe"** field, paste your VPS's IPv4 address (same as the `VPS_IP` secret). This guards against accidental disk wipes.
+5. Click **Run workflow** (green button).
+
+<!-- screenshot: GitHub Actions "Install NixOS" workflow_dispatch dialog with IP input field -->
+
+The workflow takes ~10 minutes. Watch the log; the most informative line is the final one from `nixos-anywhere` ("Installation finished successfully").
+
+When it finishes the server reboots into NixOS and auto-joins Tailscale within ~2 minutes.
 
 ### 8. Verify Tailscale
 
@@ -133,17 +246,56 @@ git push
 
 Do this **before your first deploy**.
 
-### 10. First deploy
+### 10. Point your domain at the Tailscale IP
 
-Trigger it manually: GitHub → Actions → **Deploy NixOS** → **Run workflow**. It will:
+The services (homepage, Vaultwarden) will be served at `home.<your-domain>` and `vault.<your-domain>`. You need a wildcard DNS record pointing at the server's Tailscale IP.
+
+#### 10a. Find the server's Tailscale IP
+
+From your laptop:
+
+```bash
+tailscale ip -4 <hostname>      # e.g. tailscale ip -4 myserver
+# prints something like 100.x.y.z
+```
+
+Or open <https://login.tailscale.com/admin/machines> and copy the IPv4 from the row for your server.
+
+#### 10b. Add a wildcard A record on Cloudflare
+
+Open <https://dash.cloudflare.com/>, click your domain, then **DNS** → **Records** → **Add record**.
+
+- **Type**: `A`
+- **Name**: `*` (literal asterisk — this makes `*.<your-domain>` resolve)
+- **IPv4 address**: the `100.x.y.z` from step 10a
+- **Proxy status**: **DNS only** (the orange cloud must be OFF — Cloudflare can't proxy Tailscale IPs)
+- **TTL**: Auto
+
+Click **Save**.
+
+<!-- screenshot: Cloudflare wildcard A record form with proxy disabled -->
+
+Cert issuance still works because Cloudflare DNS-01 talks to Cloudflare's API, not to your server — the server itself doesn't need to be reachable from the public internet.
+
+### 11. First deploy
+
+In your fork on GitHub:
+
+1. Click the **Actions** tab.
+2. Left sidebar → **Deploy NixOS**.
+3. Right side → **Run workflow** → **Run workflow**.
+
+<!-- screenshot: GitHub Actions "Deploy NixOS" workflow_dispatch button -->
+
+It will:
 - Join Tailscale as an ephemeral CI node
 - Reach your server over the tailnet
 - Run `nixos-rebuild switch`
 - Push the Cloudflare and Vaultwarden tokens to `/var/lib/...` and restart the affected services (only if a token actually changed)
 
-Point `*.<your-domain>` DNS A record at your server's Tailscale IP. Cert issuance works because Cloudflare DNS-01 doesn't need the server to be reachable from the internet.
+After it completes, open `https://home.<your-domain>` from a Tailscale-connected machine. You should see the homepage dashboard with a valid Let's Encrypt cert.
 
-### 11. Lock down
+### 12. Lock down
 
 Once you've confirmed `tailscale ping <hostname>` works **and** SSH over Tailscale works:
 
