@@ -7,6 +7,8 @@ in
     "d /mnt/appdata/opencloud         0755 root root - -"
     "d /mnt/appdata/opencloud/config  0755 root root - -"
     "d /mnt/appdata/opencloud/data    0755 root root - -"
+    # PosixFS storage root — user spaces live here as real folders.
+    "d /mnt/storage/opencloud         0755 root root - -"
     # Env file written by deploy workflow (SERVICES_PASSWORD → IDM_ADMIN_PASSWORD).
     # Mode 0644 because the init container reads it through `--env-file` and
     # may run as a non-root UID; 0400 root-only would break the init step.
@@ -85,6 +87,18 @@ in
       # Admin identity — password supplied via env file.
       IDM_ADMIN_USERNAME    = "admin";
       IDM_CREATE_DEMO_USERS = "false";
+      # PosixFS storage driver — users' spaces are real folders under
+      # STORAGE_USERS_POSIX_ROOT. Lets you put files there from the host
+      # (or Immich, OpenCloud sync, etc.) and have them appear in the UI.
+      STORAGE_USERS_DRIVER            = "posix";
+      # Dedicated subdir so OpenCloud's PosixFS layout doesn't collide with
+      # Immich's /mnt/storage/photos tree. After init you can bind-mount
+      # /mnt/storage/photos into a user's space dir (see README).
+      STORAGE_USERS_POSIX_ROOT        = "/mnt/storage/opencloud";
+      STORAGE_USERS_ID_CACHE_STORE    = "nats-js-kv";
+      # `inotify`-based watch so files added externally are picked up live.
+      STORAGE_USERS_POSIX_WATCH_FS    = "true";
+
       # OnlyOffice (collaborative office editor) WOPI integration.
       COLLABORATION_APP_NAME          = "OnlyOffice";
       COLLABORATION_APP_PRODUCT       = "OnlyOffice";
