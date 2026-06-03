@@ -1,4 +1,73 @@
 { pkgs, userConfig, ports, ... }:
+let
+  settings = pkgs.writeText "homepage-settings.yaml" ''
+    title: ${userConfig.hostname}
+    theme: dark
+    color: slate
+    useEqualHeights: true
+    statusStyle: dot
+    headerStyle: clean
+    layout:
+      Productivity:
+        style: row
+        columns: 3
+        icon: mdi-briefcase-outline
+      Media:
+        style: row
+        columns: 3
+        icon: mdi-play-circle-outline
+      Infrastructure:
+        style: row
+        columns: 3
+        icon: mdi-server-outline
+  '';
+
+  services = pkgs.writeText "homepage-services.yaml" ''
+    - Productivity:
+        - Vaultwarden:
+            href: https://pwdman.${userConfig.domain}
+            description: Password manager
+            icon: bitwarden.svg
+        - OpenCloud:
+            href: https://cloud.${userConfig.domain}
+            description: Files & collaboration
+            icon: mdi-cloud-outline
+
+    - Media:
+        - Immich:
+            href: https://photos.${userConfig.domain}
+            description: Photo library
+            icon: immich.svg
+
+    - Infrastructure:
+        - Traefik:
+            href: https://${userConfig.domain}
+            description: Reverse proxy (this host)
+            icon: traefik.svg
+  '';
+
+  widgets = pkgs.writeText "homepage-widgets.yaml" ''
+    - datetime:
+        text_size: 2xl
+        format:
+          dateStyle: long
+          timeStyle: short
+          hour12: false
+    - resources:
+        backend: resources
+        expanded: true
+        cpu: true
+        memory: true
+        disk: /
+  '';
+
+  bookmarks = pkgs.writeText "homepage-bookmarks.yaml" "[]";
+
+  dockerCfg = pkgs.writeText "homepage-docker.yaml" ''
+    my-server:
+      socket: /var/run/docker.sock
+  '';
+in
 {
   systemd.tmpfiles.rules = [
     "d /var/lib/homepage         0755 root root - -"
@@ -28,7 +97,12 @@
       HOMEPAGE_ALLOWED_HOSTS = userConfig.domain;
     };
     volumes = [
-      "/var/lib/homepage/config:/app/config"
+      "/var/run/docker.sock:/var/run/docker.sock:ro"
+      "${settings}:/app/config/settings.yaml:ro"
+      "${services}:/app/config/services.yaml:ro"
+      "${widgets}:/app/config/widgets.yaml:ro"
+      "${bookmarks}:/app/config/bookmarks.yaml:ro"
+      "${dockerCfg}:/app/config/docker.yaml:ro"
     ];
   };
 }
