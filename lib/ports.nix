@@ -1,6 +1,6 @@
 # Centralised port registry. Append next free number when adding a service.
 # Standard ports kept at conventional numbers; app ports sequential from 8001.
-# Next free port: 8003
+# Next free port: 8004
 {
   # Standard
   traefikHttp  = 80;
@@ -9,5 +9,7 @@
   # Application ports
   homepage    = 8001;
   vaultwarden = 8002;
-  # Next free port: 8003
+  immich      = 2283;  # conventional Immich port
+  opencloud   = 8003;
+  # Next free port: 8004
 }

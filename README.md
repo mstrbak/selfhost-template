@@ -208,6 +208,7 @@ Add each row below by clicking **New repository secret**, pasting the exact `Nam
 | `TAILSCALE_OAUTH_SECRET` | `tskey-client-...` | OAuth client secret from step 3d |
 | `CLOUDFLARE_DNS_API_TOKEN` | The token shown after creation | Cloudflare token from step 4b |
 | `VAULTWARDEN_ADMIN_TOKEN` | An argon2 hash like `$argon2id$v=19$m=...` | **Optional.** Only set if you want Vaultwarden's `/admin` panel enabled. Generate by running `docker run --rm -it vaultwarden/server /vaultwarden hash` on any machine with Docker — enter a password twice, copy the `$argon2id$...` string it prints. |
+| `SERVICES_PASSWORD` | A strong plaintext password (≥ 20 chars recommended) | Shared by Immich's Postgres DB and OpenCloud's admin user. Reusing one password is a homelab compromise — compromise of one container = compromise of the other. If you outgrow that, split into `IMMICH_DB_PASSWORD` and `OPENCLOUD_ADMIN_PASSWORD` later. |
 
 **Personal identifiers** (these would normally land in `config.nix`, but since your fork is public we inject them from secrets so they never leak into the repo)
 
@@ -302,7 +303,16 @@ Do this **before your first deploy**.
 
 ### 10. Point your domain at the Tailscale IP
 
-The homepage dashboard is served at the apex `<your-domain>`. Vaultwarden at `pwdman.<your-domain>` (note: `pwdman`, not `vault` — Chrome anti-phishing flags the latter as a Bitwarden lookalike). You need both an apex A record and a wildcard pointing at the server's Tailscale IP.
+Services served by this template:
+
+| URL | Service |
+|---|---|
+| `<your-domain>` | Homepage dashboard |
+| `pwdman.<your-domain>` | Vaultwarden (note: `pwdman` not `vault` — Chrome anti-phishing flags Bitwarden lookalikes) |
+| `photos.<your-domain>` | Immich |
+| `cloud.<your-domain>` | OpenCloud |
+
+DNS: add an apex A record (for the dashboard) and a wildcard `*.<your-domain>` (for the rest), both pointing at the server's Tailscale IP, DNS-only (no Cloudflare proxy).
 
 #### 10a. Find the server's Tailscale IP
 

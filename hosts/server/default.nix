@@ -13,6 +13,8 @@
     ../../modules/infra/homepage.nix
     # apps
     ../../modules/apps/vaultwarden.nix
+    ../../modules/apps/immich.nix
+    ../../modules/apps/opencloud.nix
   ];
 
   # Docker required for OCI containers.

@@ -126,9 +126,10 @@ jobs:
       # token actually changed. Tokens never land in /nix/store.
       - name: Push runtime secrets
         env:
-          TARGET:   ${{ steps.cfg.outputs.target }}
-          CF_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
-          VW_TOKEN: ${{ secrets.VAULTWARDEN_ADMIN_TOKEN }}
+          TARGET:            ${{ steps.cfg.outputs.target }}
+          CF_TOKEN:          ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          VW_TOKEN:          ${{ secrets.VAULTWARDEN_ADMIN_TOKEN }}
+          SERVICES_PASSWORD: ${{ secrets.SERVICES_PASSWORD }}
         run: |
           set -eu
           ssh_opts="-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
@@ -166,4 +167,19 @@ jobs:
               docker-vaultwarden.service
           else
             echo "VAULTWARDEN_ADMIN_TOKEN not set — skipping Vaultwarden token push."
+          fi
+
+          if [ -n "${SERVICES_PASSWORD:-}" ]; then
+            push_secret /mnt/appdata/immich/env \
+              "DB_PASSWORD=$SERVICES_PASSWORD
+          POSTGRES_PASSWORD=$SERVICES_PASSWORD" \
+              docker-immich-server.service
+            # Postgres reads POSTGRES_PASSWORD too — restart the DB container as well.
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-immich-postgres.service" || true
+
+            push_secret /mnt/appdata/opencloud/env \
+              "IDM_ADMIN_PASSWORD=$SERVICES_PASSWORD" \
+              docker-opencloud.service
+          else
+            echo "SERVICES_PASSWORD not set — Immich + OpenCloud will fail to start."
           fi
