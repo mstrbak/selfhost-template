@@ -311,6 +311,7 @@ Services served by this template:
 | `pwdman.<your-domain>` | Vaultwarden (note: `pwdman` not `vault` — Chrome anti-phishing flags Bitwarden lookalikes) |
 | `photos.<your-domain>` | Immich |
 | `cloud.<your-domain>` | OpenCloud |
+| `office.<your-domain>` | OnlyOffice (WOPI editor used by OpenCloud) |
 
 DNS: add an apex A record (for the dashboard) and a wildcard `*.<your-domain>` (for the rest), both pointing at the server's Tailscale IP, DNS-only (no Cloudflare proxy).
 

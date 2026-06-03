@@ -11,5 +11,6 @@
   vaultwarden = 8002;
   immich      = 2283;  # conventional Immich port
   opencloud   = 9200;  # conventional OpenCloud port
-  # Next free port: 8003
+  onlyoffice  = 8003;  # internal port we route to via Traefik
+  # Next free port: 8004
 }

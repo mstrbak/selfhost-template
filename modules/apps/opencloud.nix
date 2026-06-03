@@ -85,6 +85,16 @@ in
       # Admin identity — password supplied via env file.
       IDM_ADMIN_USERNAME    = "admin";
       IDM_CREATE_DEMO_USERS = "false";
+      # OnlyOffice (collaborative office editor) WOPI integration.
+      COLLABORATION_APP_NAME          = "OnlyOffice";
+      COLLABORATION_APP_PRODUCT       = "OnlyOffice";
+      COLLABORATION_APP_DESCRIPTION   = "OnlyOffice in-browser office editor";
+      COLLABORATION_APP_ICON          = "image-edit";
+      COLLABORATION_APP_ADDR          = "https://office.${userConfig.domain}";
+      COLLABORATION_APP_INSECURE      = "false";
+      COLLABORATION_CS3API_DATAGATEWAY_INSECURE = "false";
+      # JWT secret to talk to OnlyOffice — same as OnlyOffice's JWT_SECRET.
+      # Supplied to OpenCloud via env file (reuses SERVICES_PASSWORD).
     };
     environmentFiles = [ "/mnt/appdata/opencloud/env" ];
     volumes = [

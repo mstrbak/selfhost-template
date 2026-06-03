@@ -15,6 +15,7 @@
     ../../modules/apps/vaultwarden.nix
     ../../modules/apps/immich.nix
     ../../modules/apps/opencloud.nix
+    ../../modules/apps/onlyoffice.nix
   ];
 
   # Docker required for OCI containers.

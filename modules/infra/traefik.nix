@@ -114,6 +114,7 @@ in
       "--network-alias=pwdman.${userConfig.domain}"
       "--network-alias=photos.${userConfig.domain}"
       "--network-alias=cloud.${userConfig.domain}"
+      "--network-alias=office.${userConfig.domain}"
     ];
     environmentFiles = [ "/var/lib/traefik/cf-token" ];
     volumes = [
