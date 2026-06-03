@@ -31,14 +31,42 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Read host details from config.nix
-        id: cfg
+      - name: Generate config.local.nix from secrets
+        env:
+          HOSTNAME:        ${{ secrets.HOSTNAME }}
+          USERNAME:        ${{ secrets.USERNAME }}
+          DOMAIN:          ${{ secrets.DOMAIN }}
+          ACME_EMAIL:      ${{ secrets.ACME_EMAIL }}
+          TAILNET:         ${{ secrets.TAILNET }}
+          USER_SSH_PUBKEY: ${{ secrets.USER_SSH_PUBKEY }}
         run: |
-          HOSTNAME=$(nix eval --raw .#nixosConfigurations.default.config.networking.hostName)
-          USERNAME=$(nix eval --raw --impure --expr '(import ./config.nix).username')
-          TAILNET=$(nix eval --raw --impure --expr '(import ./config.nix).tailnet')
-          echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
-          echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
+          set -eu
+          for var in HOSTNAME USERNAME DOMAIN ACME_EMAIL TAILNET USER_SSH_PUBKEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not set."
+              exit 1
+            fi
+          done
+          esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
+          cat > config.local.nix <<EOF
+          {
+            hostname     = "$(esc "$HOSTNAME")";
+            username     = "$(esc "$USERNAME")";
+            domain       = "$(esc "$DOMAIN")";
+            acmeEmail    = "$(esc "$ACME_EMAIL")";
+            tailnet      = "$(esc "$TAILNET")";
+            sshPublicKey = "$(esc "$USER_SSH_PUBKEY")";
+          }
+          EOF
+          chmod 600 config.local.nix
+
+      - name: Compute deploy target
+        id: cfg
+        env:
+          HOSTNAME: ${{ secrets.HOSTNAME }}
+          USERNAME: ${{ secrets.USERNAME }}
+          TAILNET:  ${{ secrets.TAILNET }}
+        run: |
           echo "target=$USERNAME@$HOSTNAME.$TAILNET" >> "$GITHUB_OUTPUT"
 
       # Tailscale SSH is used for auth — no openssh keypair, no DEPLOY_SSH_KEY.

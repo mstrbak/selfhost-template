@@ -15,9 +15,24 @@
 
   outputs = { self, nixpkgs, disko, ... }@inputs:
     let
-      userConfig  = import ./config.nix;
+      # Non-sensitive defaults committed to the repo.
+      base = import ./config.nix;
+      # Sensitive overrides injected by GitHub Actions (gitignored). Falls back
+      # to placeholders so `nix flake check` works locally without secrets.
+      overrides =
+        if builtins.pathExists ./config.local.nix
+        then import ./config.local.nix
+        else {
+          hostname     = "myserver";
+          username     = "admin";
+          domain       = "example.com";
+          acmeEmail    = "you@example.com";
+          tailnet      = "tail0000.ts.net";
+          sshPublicKey = "ssh-ed25519 AAAA_PLACEHOLDER you@laptop";
+        };
+      userConfig   = base // overrides;
       stateVersion = "24.11";
-      libx = import ./lib { inherit inputs userConfig stateVersion; };
+      libx   = import ./lib { inherit inputs userConfig stateVersion; };
       server = libx.mkNixos { system = "x86_64-linux"; };
     in {
       nixosConfigurations = {

@@ -2,7 +2,7 @@
 
 Public template for spinning up a **NixOS server on a Contabo VPS**, fully managed via GitHub Actions, with **Tailscale-only access** after install.
 
-Fork → edit `config.nix` → set repo secrets → trigger the install workflow. That's the whole flow.
+Fork → set repo secrets → edit `config.nix` (a few non-sensitive defaults) → trigger the install workflow. That's the whole flow.
 
 ## What you get
 
@@ -57,7 +57,7 @@ After creating your Tailscale account, you'll do three things in the admin conso
 
 You'll need it to reach your server after install. Download from <https://tailscale.com/download> and log in. Verify with `tailscale status` in a terminal.
 
-While you're there, note your **tailnet name**: open <https://login.tailscale.com/admin/dns> and look at the top of the page — you'll see something like `tail1234.ts.net`. You'll paste this into `config.nix` in step 6.
+While you're there, note your **tailnet name**: open <https://login.tailscale.com/admin/dns> and look at the top of the page — you'll see something like `tail1234.ts.net`. You'll paste this into the `TAILNET` GitHub secret in step 5.
 
 <!-- screenshot: Tailscale DNS page highlighting the tailnet name -->
 
@@ -65,7 +65,7 @@ While you're there, note your **tailnet name**: open <https://login.tailscale.co
 
 Open <https://login.tailscale.com/admin/acls/file>. Replace the entire contents with the snippet below, then click **Save**.
 
-Replace `admin` with the `username` you'll set in `config.nix`:
+Replace `admin` with the username you'll set in the `USERNAME` GitHub secret (step 5):
 
 ```hujson
 {
@@ -155,6 +155,8 @@ Add each row below by clicking **New repository secret**, pasting the exact `Nam
 
 <!-- screenshot: GitHub repo secrets page with "New repository secret" button highlighted -->
 
+**Provisioning / credentials**
+
 | Name | Value | Where it comes from |
 |---|---|---|
 | `VPS_IP` | Your VPS's IPv4 address | Contabo "Your VPS is ready" email (step 2) |
@@ -165,27 +167,34 @@ Add each row below by clicking **New repository secret**, pasting the exact `Nam
 | `CLOUDFLARE_DNS_API_TOKEN` | The token shown after creation | Cloudflare token from step 4b |
 | `VAULTWARDEN_ADMIN_TOKEN` | An argon2 hash like `$argon2id$v=19$m=...` | **Optional.** Only set if you want Vaultwarden's `/admin` panel enabled. Generate by running `docker run --rm -it vaultwarden/server /vaultwarden hash` on any machine with Docker — enter a password twice, copy the `$argon2id$...` string it prints. |
 
+**Personal identifiers** (these would normally land in `config.nix`, but since your fork is public we inject them from secrets so they never leak into the repo)
+
+| Name | Value | Notes |
+|---|---|---|
+| `HOSTNAME` | Short name for your server, e.g. `aurora` | Shows up in Tailscale, shell prompt, and as a DNS label (`<hostname>.<tailnet>.ts.net`). Lowercase, no dots. |
+| `USERNAME` | The Linux user you'll log in as, e.g. `martin` | Must match the username in your Tailscale ACL (step 3b). |
+| `DOMAIN` | Your domain, e.g. `example.com` | Used by Traefik to mint certs for `*.<DOMAIN>`. |
+| `ACME_EMAIL` | Your email | Let's Encrypt sends cert-expiry warnings here. |
+| `TAILNET` | Your tailnet DNS suffix, e.g. `tail1234.ts.net` | From <https://login.tailscale.com/admin/dns> (step 3a). |
+| `USER_SSH_PUBKEY` | Your laptop's SSH **public** key, single line starting with `ssh-ed25519 AAAA...` | Used as emergency fallback access while public SSH is open. See "Where do I get this?" below. |
+
 The deploy workflow pushes the Cloudflare and Vaultwarden tokens over Tailscale SSH after each rebuild. Files land at `/var/lib/<svc>/...` with mode 0400 root-owned. Tokens never enter `/nix/store`.
 
 ### 6. Edit `config.nix`
 
-In your fork, open `config.nix` (root of the repo). Edit each value:
+In your fork, open `config.nix` (root of the repo). It contains only the non-sensitive defaults — personal info comes from the secrets above. Edit:
 
 ```nix
 {
-  hostname = "myserver";              # a short name; appears in Tailscale and shell prompt
-  username = "admin";                 # MUST match the username in your Tailscale ACL (step 3b)
-  domain    = "example.com";          # your Cloudflare-managed domain
-  acmeEmail = "you@example.com";      # used by Let's Encrypt for expiry warnings
-  tailnet   = "tail1234.ts.net";      # from Tailscale DNS page (step 3a)
   diskDevice = "/dev/sda";            # /dev/sda for Contabo SSD; /dev/vda or /dev/nvme0n1 for some NVMe plans
-  timeZone = "Europe/Bratislava";     # IANA tz name; see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-  sshPublicKey = "ssh-ed25519 AAAA... you@laptop";   # YOUR laptop's pubkey — emergency fallback access
+  timeZone   = "Europe/Bratislava";   # IANA tz; see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
   publicSshFallback = true;           # leave true until step 12 (lockdown)
 }
 ```
 
-#### Where do I get `sshPublicKey`?
+Commit and push.
+
+#### Where do I get `USER_SSH_PUBKEY` (for step 5)?
 
 On your laptop terminal:
 
@@ -193,13 +202,15 @@ On your laptop terminal:
 # Mac/Linux — create one if you don't have it:
 test -f ~/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -N ''
 
-# Print it:
+# Print it — paste the entire single line into the secret value:
 cat ~/.ssh/id_ed25519.pub
 ```
 
-Paste the entire single line (starts with `ssh-ed25519 AAAA...` and ends with `your-email@your-machine` or similar) into the `sshPublicKey` field.
+The line starts with `ssh-ed25519 AAAA...` and ends with a comment like `you@your-laptop`. Paste it whole.
 
-Commit and push your changes.
+#### How does this work?
+
+At workflow runtime, GitHub Actions generates a `config.local.nix` file from your secrets and merges it with `config.nix`. The merged result feeds the NixOS build. `config.local.nix` is gitignored — it never enters the repo.
 
 ### 7. Run the install workflow
 

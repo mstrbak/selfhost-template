@@ -40,6 +40,36 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
+      - name: Generate config.local.nix from secrets
+        env:
+          HOSTNAME:        ${{ secrets.HOSTNAME }}
+          USERNAME:        ${{ secrets.USERNAME }}
+          DOMAIN:          ${{ secrets.DOMAIN }}
+          ACME_EMAIL:      ${{ secrets.ACME_EMAIL }}
+          TAILNET:         ${{ secrets.TAILNET }}
+          USER_SSH_PUBKEY: ${{ secrets.USER_SSH_PUBKEY }}
+        run: |
+          set -eu
+          for var in HOSTNAME USERNAME DOMAIN ACME_EMAIL TAILNET USER_SSH_PUBKEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not set."
+              exit 1
+            fi
+          done
+          # Nix string interpolation/escape: backslash and double-quote only.
+          esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'; }
+          cat > config.local.nix <<EOF
+          {
+            hostname     = "$(esc "$HOSTNAME")";
+            username     = "$(esc "$USERNAME")";
+            domain       = "$(esc "$DOMAIN")";
+            acmeEmail    = "$(esc "$ACME_EMAIL")";
+            tailnet      = "$(esc "$TAILNET")";
+            sshPublicKey = "$(esc "$USER_SSH_PUBKEY")";
+          }
+          EOF
+          chmod 600 config.local.nix
+
       - name: Validate VPS_ROOT_PASSWORD secret
         env:
           PW: ${{ secrets.VPS_ROOT_PASSWORD }}

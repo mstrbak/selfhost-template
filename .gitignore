@@ -3,3 +3,6 @@ result-*
 .direnv/
 *.swp
 .DS_Store
+
+# Generated at workflow run time from GH secrets — must NEVER be committed.
+config.local.nix
