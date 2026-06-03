@@ -26,9 +26,16 @@
   time.timeZone = userConfig.timeZone;
   i18n.defaultLocale = "en_US.UTF-8";
 
+  # Contabo VPS S/M/L use SeaBIOS legacy boot — no UEFI exposed in the panel.
+  # Use GRUB on the BIOS Boot Partition declared in disko.nix.
   boot.loader = {
-    systemd-boot.enable = true;
-    efi.canTouchEfiVariables = true;
+    systemd-boot.enable = false;
+    efi.canTouchEfiVariables = false;
+    grub = {
+      enable = true;
+      device = userConfig.diskDevice;
+      efiSupport = false;
+    };
   };
 
   environment.systemPackages = with pkgs; [
