@@ -100,12 +100,18 @@ in
       STORAGE_USERS_POSIX_WATCH_FS    = "true";
 
       # OnlyOffice (collaborative office editor) WOPI integration.
+      # Single-binary deploy does NOT start collaboration service by default —
+      # opt-in plus gateway + app-registry it depends on.
+      OC_ADD_RUN_SERVICES             = "gateway,app-registry,collaboration";
       COLLABORATION_APP_NAME          = "OnlyOffice";
       COLLABORATION_APP_PRODUCT       = "OnlyOffice";
       COLLABORATION_APP_DESCRIPTION   = "OnlyOffice in-browser office editor";
       COLLABORATION_APP_ICON          = "image-edit";
       COLLABORATION_APP_ADDR          = "https://office.${userConfig.domain}";
       COLLABORATION_APP_INSECURE      = "false";
+      # WOPI_SRC = URL OnlyOffice uses to call back to OpenCloud's WOPI bridge.
+      # For single-binary deploy with one external URL we reuse OC_URL.
+      COLLABORATION_WOPI_SRC          = "https://cloud.${userConfig.domain}";
       COLLABORATION_CS3API_DATAGATEWAY_INSECURE = "false";
       # JWT secret to talk to OnlyOffice — same as OnlyOffice's JWT_SECRET.
       # Supplied to OpenCloud via env file (reuses SERVICES_PASSWORD).
