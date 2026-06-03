@@ -29,7 +29,7 @@
     environment = {
       DOMAIN = "https://pwdman.${userConfig.domain}";
       ROCKET_PORT = toString ports.vaultwarden;
-      SIGNUPS_ALLOWED = "false";
+      SIGNUPS_ALLOWED = "true";
     };
     environmentFiles = [ "/var/lib/vaultwarden/env" ];
     volumes = [
