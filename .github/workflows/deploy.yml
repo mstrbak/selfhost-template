@@ -179,6 +179,10 @@ jobs:
 
             printf 'IDM_ADMIN_PASSWORD=%s\n' "$SERVICES_PASSWORD" | \
               push_secret /mnt/appdata/opencloud/env docker-opencloud.service
+            # If first deploy, opencloud-init couldn't run (env was empty during
+            # nixos-rebuild). Retry it now, then start the server container.
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart opencloud-init.service" || true
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-opencloud.service" || true
           else
             echo "SERVICES_PASSWORD not set — Immich + OpenCloud will fail to start."
           fi

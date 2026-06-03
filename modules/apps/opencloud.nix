@@ -4,16 +4,50 @@ let
 in
 {
   systemd.tmpfiles.rules = [
-    "d /mnt/appdata/opencloud         0750 root root - -"
-    "d /mnt/appdata/opencloud/config  0750 root root - -"
-    "d /mnt/appdata/opencloud/data    0750 root root - -"
-    # Env file written by deploy workflow (SERVICES_PASSWORD → IDM_ADMIN_PASSWORD)
-    "f /mnt/appdata/opencloud/env     0400 root root - -"
+    "d /mnt/appdata/opencloud         0755 root root - -"
+    "d /mnt/appdata/opencloud/config  0755 root root - -"
+    "d /mnt/appdata/opencloud/data    0755 root root - -"
+    # Env file written by deploy workflow (SERVICES_PASSWORD → IDM_ADMIN_PASSWORD).
+    # Mode 0644 because the init container reads it through `--env-file` and
+    # may run as a non-root UID; 0400 root-only would break the init step.
+    "f /mnt/appdata/opencloud/env     0644 root root - -"
   ];
 
+  # OpenCloud requires `opencloud init` to generate /etc/opencloud/opencloud.yaml
+  # before `opencloud server` will start. Idempotent: skips if the file exists.
+  systemd.services.opencloud-init = {
+    description = "OpenCloud one-shot init (config generation)";
+    wantedBy = [ "multi-user.target" ];
+    before   = [ "docker-opencloud.service" ];
+    after    = [ "docker.service" "create-traefik-network.service" ];
+    requires = [ "docker.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if [ -f /mnt/appdata/opencloud/config/opencloud.yaml ]; then
+        echo "OpenCloud already initialized; skipping."
+        exit 0
+      fi
+      if [ ! -s /mnt/appdata/opencloud/env ]; then
+        # First-boot ordering: env file is written by the deploy workflow's
+        # secret-push step, which runs AFTER nixos-rebuild. Exit success here
+        # and rely on the deploy workflow restarting this unit afterwards.
+        echo "OpenCloud env file empty; deferring init until secrets pushed."
+        exit 0
+      fi
+      ${pkgs.docker}/bin/docker run --rm \
+        --user=0:0 \
+        -v /mnt/appdata/opencloud/config:/etc/opencloud \
+        --env-file /mnt/appdata/opencloud/env \
+        ${image} init
+    '';
+  };
+
   systemd.services.docker-opencloud = {
-    after    = [ "create-traefik-network.service" ];
-    requires = [ "create-traefik-network.service" ];
+    after    = [ "create-traefik-network.service" "opencloud-init.service" ];
+    requires = [ "create-traefik-network.service" "opencloud-init.service" ];
   };
 
   virtualisation.oci-containers.containers.opencloud = {
@@ -22,6 +56,10 @@ in
     cmd = [ "server" ];
     extraOptions = [
       "--network=traefik"
+      # Run as root inside the container so bind-mounted host dirs are
+      # readable+writable regardless of host UID. Acceptable for a homelab
+      # single-host setup.
+      "--user=0:0"
       "--label=traefik.enable=true"
       "--label=traefik.http.routers.opencloud.rule=Host(`cloud.${userConfig.domain}`)"
       "--label=traefik.http.routers.opencloud.entrypoints=websecure"
@@ -30,19 +68,18 @@ in
       "--label=traefik.http.services.opencloud.loadbalancer.server.port=${toString ports.opencloud}"
     ];
     environment = {
-      OC_URL              = "https://cloud.${userConfig.domain}";
-      OC_LOG_LEVEL        = "info";
-      OC_INSECURE         = "false";
-      PROXY_HTTP_ADDR     = "0.0.0.0:${toString ports.opencloud}";
-      # Admin identity — password comes from env file (SERVICES_PASSWORD).
-      IDM_ADMIN_USERNAME  = "admin";
+      OC_URL                = "https://cloud.${userConfig.domain}";
+      OC_LOG_LEVEL          = "info";
+      OC_INSECURE           = "false";
+      # Admin identity — password supplied via env file.
+      IDM_ADMIN_USERNAME    = "admin";
       IDM_CREATE_DEMO_USERS = "false";
     };
     environmentFiles = [ "/mnt/appdata/opencloud/env" ];
     volumes = [
       "/mnt/appdata/opencloud/config:/etc/opencloud"
       "/mnt/appdata/opencloud/data:/var/lib/opencloud"
-      # OpenCloud reads/writes user data on shared storage (same dir Immich uses for photos).
+      # OpenCloud reads/writes user data on shared storage (Immich also uses this).
       "/mnt/storage:/mnt/storage"
     ];
   };

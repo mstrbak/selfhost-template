@@ -10,6 +10,6 @@
   homepage    = 8001;
   vaultwarden = 8002;
   immich      = 2283;  # conventional Immich port
-  opencloud   = 8003;
-  # Next free port: 8004
+  opencloud   = 9200;  # conventional OpenCloud port
+  # Next free port: 8003
 }
