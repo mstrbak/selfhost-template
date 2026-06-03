@@ -40,14 +40,21 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = true
 
-      - name: Set up SSH key for root@VPS
+      - name: Validate VPS_ROOT_PASSWORD secret
         env:
-          KEY: ${{ secrets.VPS_ROOT_SSH_KEY }}
+          PW: ${{ secrets.VPS_ROOT_PASSWORD }}
+        run: |
+          if [ -z "$PW" ]; then
+            echo "::error::VPS_ROOT_PASSWORD secret is not set. Copy the root password from your Contabo welcome email."
+            exit 1
+          fi
+
+      - name: Install sshpass
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+
+      - name: Pre-seed known_hosts
         run: |
           mkdir -p ~/.ssh
-          umask 077
-          printf '%s\n' "$KEY" > ~/.ssh/id_install
-          chmod 600 ~/.ssh/id_install
           ssh-keyscan -H "${{ secrets.VPS_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Write Tailscale auth key for first-boot autoconnect
@@ -65,12 +72,14 @@ jobs:
 
       - name: Run nixos-anywhere
         env:
-          SSH_OPTS: "-i ~/.ssh/id_install -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
+          # nixos-anywhere --env-password reads SSHPASS from env and uses sshpass
+          # internally for the initial root SSH connection.
+          SSHPASS: ${{ secrets.VPS_ROOT_PASSWORD }}
         run: |
           nix run github:nix-community/nixos-anywhere -- \
             --flake .#default \
             --extra-files extra-files \
-            --ssh-option "IdentityFile=$HOME/.ssh/id_install" \
+            --env-password \
             --ssh-option "StrictHostKeyChecking=accept-new" \
             root@${{ secrets.VPS_IP }}
 
@@ -78,3 +87,7 @@ jobs:
         run: |
           echo "Install complete. Server will reboot and auto-join Tailscale."
           echo "Verify on your laptop: tailscale status | grep <hostname>"
+          echo ""
+          echo "Next: copy /etc/nixos/hardware-configuration.nix from the server"
+          echo "to hosts/server/hardware-configuration.nix in your repo, commit and push."
+          echo "See README §'Sync hardware-configuration.nix' for the exact command."

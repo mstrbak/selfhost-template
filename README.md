@@ -11,7 +11,7 @@ Fork → edit `config.nix` → set repo secrets → trigger the install workflow
 - Firewall on; public 80/443 closed; SSH closes too once you flip a flag
 - Traefik reverse proxy bound to the Tailscale interface, valid Let's Encrypt certs via Cloudflare DNS-01
 - Two example services: homepage dashboard + Vaultwarden
-- Push to `main` → `nixos-rebuild switch` runs on the server over Tailscale
+- Manually trigger the deploy workflow → `nixos-rebuild switch` runs on the server over Tailscale
 
 ## Prerequisites
 
@@ -24,53 +24,63 @@ Fork → edit `config.nix` → set repo secrets → trigger the install workflow
 
 ### 1. Fork this repo
 
-### 2. Get root SSH access on the VPS
+### 2. Note your VPS root password
 
-From your laptop (Contabo emails you the root password once):
+Contabo emails you the root password once at provisioning. You'll paste it into a GitHub secret in step 5 — no local SSH commands needed.
 
-```bash
-ssh-copy-id root@<VPS_IP>
-ssh root@<VPS_IP> 'echo ok'   # verify
-```
+After install, password SSH is disabled. Rotate or destroy the original Contabo root password afterwards if you want.
 
-### 3. Generate a deploy SSH keypair
-
-This key lets GitHub Actions SSH into your server over Tailscale after install.
-
-```bash
-ssh-keygen -t ed25519 -f ./deploy_key -N ''
-cat deploy_key.pub      # → goes into config.nix
-cat deploy_key          # → goes into the DEPLOY_SSH_KEY secret
-```
-
-### 4. Tailscale setup
+### 3. Tailscale setup
 
 - **Auth key** (admin console → Settings → Keys): create a **reusable**, **pre-approved**, **non-ephemeral** key. Tag it `tag:server`. This key is baked into your server at install time.
 - **OAuth client** (admin console → Settings → OAuth clients): create a client with scope `devices:write`, tag `tag:ci`. Used by the deploy workflow to spin up an ephemeral runner node.
-- Make sure `tag:server` and `tag:ci` exist in your ACL.
+- **Tailscale ACL** (admin console → Access Controls): paste the snippet below. It declares the tags and lets the CI runner SSH into your server via Tailscale identity — no SSH keys needed.
 
-### 5. Cloudflare API token
+  Replace `admin` with the `username` you'll set in `config.nix`:
+
+  ```hujson
+  {
+    "tagOwners": {
+      "tag:server": ["autogroup:admin"],
+      "tag:ci":     ["autogroup:admin"]
+    },
+    "ssh": [
+      {
+        "action": "accept",
+        "src":    ["tag:ci"],
+        "dst":    ["tag:server"],
+        "users":  ["admin", "root"]
+      }
+    ],
+    "acls": [
+      { "action": "accept", "src": ["tag:ci"], "dst": ["tag:server:*"] }
+    ]
+  }
+  ```
+
+### 4. Cloudflare API token
 
 Cloudflare dashboard → My Profile → API Tokens → Create:
 - Permission: `Zone:DNS:Edit`
 - Zone Resources: include your domain only
 
-### 6. Add GitHub Actions secrets
+### 5. Add GitHub Actions secrets
 
 In your fork → Settings → Secrets and variables → Actions:
 
 | Secret | Purpose |
 |---|---|
 | `VPS_IP` | Your VPS public IP. Also used to confirm disk wipes. |
-| `VPS_ROOT_SSH_KEY` | Private key (matching the one you `ssh-copy-id`'d) for `root@VPS_IP`. Used during install only. |
-| `TAILSCALE_AUTHKEY` | The reusable auth key from step 4. |
-| `TAILSCALE_OAUTH_CLIENT_ID` | OAuth client ID from step 4. |
-| `TAILSCALE_OAUTH_SECRET` | OAuth client secret from step 4. |
-| `DEPLOY_SSH_KEY` | Private key (`deploy_key` from step 3). |
+| `VPS_ROOT_PASSWORD` | Contabo root password from the welcome email. Used by the install workflow only; after install, password SSH is disabled. |
+| `TAILSCALE_AUTHKEY` | The reusable auth key from step 3. |
+| `TAILSCALE_OAUTH_CLIENT_ID` | OAuth client ID from step 3. |
+| `TAILSCALE_OAUTH_SECRET` | OAuth client secret from step 3. |
+| `CLOUDFLARE_DNS_API_TOKEN` | The Cloudflare token from step 4. The deploy workflow pushes it to `/var/lib/traefik/cf-token` on the server. |
+| `VAULTWARDEN_ADMIN_TOKEN` | **Argon2-hashed** Vaultwarden admin token. Generate with `docker run --rm -it vaultwarden/server /vaultwarden hash` and paste the resulting `$argon2id$...` string. Leave unset if you don't use Vaultwarden's admin panel. |
 
-The Cloudflare token is handled after the first deploy — see step 10.
+The deploy workflow pushes these tokens over Tailscale SSH after each rebuild. Files land at `/var/lib/<svc>/...` with mode 0400 root-owned. Tokens never enter `/nix/store`.
 
-### 7. Edit `config.nix`
+### 6. Edit `config.nix`
 
 ```nix
 {
@@ -81,20 +91,20 @@ The Cloudflare token is handled after the first deploy — see step 10.
   tailnet   = "tail1234.ts.net";     # your tailnet's DNS suffix
   diskDevice = "/dev/sda";
   timeZone = "Europe/Bratislava";
-  sshPublicKey = "ssh-ed25519 AAAA... deploy_key";   # pubkey from step 3
+  sshPublicKey = "ssh-ed25519 AAAA... you@laptop";   # YOUR laptop's pubkey (~/.ssh/id_ed25519.pub) — emergency fallback access
   publicSshFallback = true;          # leave true until lockdown step
 }
 ```
 
 Commit and push.
 
-### 8. Run the install workflow
+### 7. Run the install workflow
 
 GitHub → Actions → **Install NixOS** → **Run workflow**. You must type the VPS IP exactly into the confirmation field — this guards against accidental disk wipes.
 
-The workflow takes ~10 minutes. When it finishes, the server reboots, comes up in NixOS, and auto-joins Tailscale.
+The workflow takes ~10 minutes. When it finishes the server reboots into NixOS and auto-joins Tailscale.
 
-### 9. Verify Tailscale
+### 8. Verify Tailscale
 
 From your laptop:
 
@@ -106,21 +116,30 @@ ssh <username>@<hostname>.<tailnet>.ts.net   # works over Tailscale
 
 You should also still be able to SSH on the public IP as `<username>` (key-only). That's the fallback.
 
-### 10. First deploy & Cloudflare token
+### 9. Sync `hardware-configuration.nix`
 
-Push any commit to `main` (or trigger the deploy workflow manually). It will:
+The repo ships with a generic stub at `hosts/server/hardware-configuration.nix`. The real one was generated on your VPS during install — copy it back into the repo so future rebuilds use the accurate kernel modules, filesystems, and hardware quirks for your machine.
+
+From your laptop (over Tailscale):
+
+```bash
+scp <username>@<hostname>.<tailnet>.ts.net:/etc/nixos/hardware-configuration.nix \
+    hosts/server/hardware-configuration.nix
+
+git add hosts/server/hardware-configuration.nix
+git commit -m "sync hardware-configuration.nix from install"
+git push
+```
+
+Do this **before your first deploy**.
+
+### 10. First deploy
+
+Trigger it manually: GitHub → Actions → **Deploy NixOS** → **Run workflow**. It will:
 - Join Tailscale as an ephemeral CI node
 - Reach your server over the tailnet
 - Run `nixos-rebuild switch`
-
-Then place the Cloudflare token on the server (one-time, manual, until proper secret management is wired in — see `llm_wiki/todo/08-secrets-management.md`):
-
-```bash
-ssh <username>@<hostname>.<tailnet>.ts.net
-sudo bash -c 'echo "CF_DNS_API_TOKEN=YOUR_TOKEN_HERE" > /var/lib/traefik/cf-token'
-sudo chmod 400 /var/lib/traefik/cf-token
-sudo systemctl restart docker-traefik
-```
+- Push the Cloudflare and Vaultwarden tokens to `/var/lib/...` and restart the affected services (only if a token actually changed)
 
 Point `*.<your-domain>` DNS A record at your server's Tailscale IP. Cert issuance works because Cloudflare DNS-01 doesn't need the server to be reachable from the internet.
 
@@ -133,7 +152,7 @@ Once you've confirmed `tailscale ping <hostname>` works **and** SSH over Tailsca
 publicSshFallback = false;
 ```
 
-Push. The next deploy closes public 22/tcp. Your server is now only reachable over Tailscale.
+Push, then manually trigger the Deploy NixOS workflow again. It will close public 22/tcp. Your server is now only reachable over Tailscale.
 
 ## Recovery
 

@@ -1,13 +1,6 @@
 name: Deploy NixOS
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "llm_wiki/**"
-      - "README.md"
-      - "LICENSE"
-      - ".gitignore"
   workflow_dispatch:
 
 concurrency:
@@ -48,22 +41,14 @@ jobs:
           echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
           echo "target=$USERNAME@$HOSTNAME.$TAILNET" >> "$GITHUB_OUTPUT"
 
-      - name: Set up deploy SSH key
-        env:
-          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          umask 077
-          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-
+      # Tailscale SSH is used for auth — no openssh keypair, no DEPLOY_SSH_KEY.
+      # Tailnet ACL must allow `tag:ci -> tag:server` SSH (see README §Tailscale).
       - name: Wait for target to be reachable over Tailscale
         env:
           TARGET: ${{ steps.cfg.outputs.target }}
         run: |
           for i in $(seq 1 30); do
-            if ssh -i ~/.ssh/id_deploy \
-                   -o StrictHostKeyChecking=accept-new \
+            if ssh -o StrictHostKeyChecking=accept-new \
                    -o ConnectTimeout=5 \
                    -o BatchMode=yes \
                    "$TARGET" true 2>/dev/null; then
@@ -74,14 +59,61 @@ jobs:
             sleep 5
           done
           echo "::error::Could not reach $TARGET over Tailscale within 150s."
+          echo "Check: (1) server is on tailnet, (2) tailnet ACL allows tag:ci -> tag:server SSH, (3) config.nix tailnet matches your tailnet DNS suffix."
           exit 1
 
       - name: Deploy via nixos-rebuild
         env:
           TARGET: ${{ steps.cfg.outputs.target }}
-          NIX_SSHOPTS: "-i /home/runner/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/home/runner/.ssh/known_hosts"
+          NIX_SSHOPTS: "-o StrictHostKeyChecking=accept-new"
         run: |
           nix run nixpkgs#nixos-rebuild -- switch \
             --flake .#default \
             --target-host "$TARGET" \
             --use-remote-sudo
+
+      # Push runtime secrets to the server. Only restarts services whose
+      # token actually changed. Tokens never land in /nix/store.
+      - name: Push runtime secrets
+        env:
+          TARGET:   ${{ steps.cfg.outputs.target }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+          VW_TOKEN: ${{ secrets.VAULTWARDEN_ADMIN_TOKEN }}
+        run: |
+          set -eu
+          ssh_opts="-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+
+          push_secret() {
+            local path="$1" content="$2" service="$3"
+            local local_hash remote_hash
+            local_hash=$(printf '%s' "$content" | sha256sum | awk '{print $1}')
+            remote_hash=$(ssh $ssh_opts "$TARGET" \
+              "sudo sha256sum '$path' 2>/dev/null | awk '{print \$1}'" || echo "")
+            # /dev/null hash is e3b0...; treat as empty
+            if [ "$remote_hash" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]; then
+              remote_hash=""
+            fi
+            if [ "$local_hash" = "$remote_hash" ]; then
+              echo "  unchanged: $path"
+              return
+            fi
+            echo "  updating:  $path -> restart $service"
+            ssh $ssh_opts "$TARGET" "sudo install -m 400 -o root -g root /dev/null '$path' && sudo tee '$path' > /dev/null" <<< "$content"
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart '$service'" || true
+          }
+
+          if [ -n "${CF_TOKEN:-}" ]; then
+            push_secret /var/lib/traefik/cf-token \
+              "CF_DNS_API_TOKEN=$CF_TOKEN" \
+              docker-traefik.service
+          else
+            echo "CLOUDFLARE_DNS_API_TOKEN not set — skipping Traefik token push."
+          fi
+
+          if [ -n "${VW_TOKEN:-}" ]; then
+            push_secret /var/lib/vaultwarden/env \
+              "ADMIN_TOKEN=$VW_TOKEN" \
+              docker-vaultwarden.service
+          else
+            echo "VAULTWARDEN_ADMIN_TOKEN not set — skipping Vaultwarden token push."
+          fi
