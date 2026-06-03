@@ -89,6 +89,11 @@ in
       image = mlImage;
       autoStart = true;
       extraOptions = [ "--network=traefik" ];
+      environment = {
+        # Force IPv4 bind — default `[::]:3003` was unreachable from
+        # immich-server over the IPv4-only Docker bridge.
+        IMMICH_HOST = "0.0.0.0";
+      };
       volumes = [
         "/mnt/appdata/immich/model-cache:/cache"
       ];
