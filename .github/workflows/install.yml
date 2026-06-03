@@ -1,0 +1,80 @@
+name: Install NixOS (DESTRUCTIVE — wipes the VPS disk)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_vps_ip:
+        description: "Type your VPS IP exactly to confirm disk wipe (must match VPS_IP secret)"
+        required: true
+        type: string
+
+jobs:
+  install:
+    name: nixos-anywhere
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Confirm disk-wipe target
+        env:
+          CONFIRM: ${{ inputs.confirm_vps_ip }}
+          EXPECTED: ${{ secrets.VPS_IP }}
+        run: |
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::VPS_IP secret is not set."
+            exit 1
+          fi
+          if [ "$CONFIRM" != "$EXPECTED" ]; then
+            echo "::error::Confirmation '$CONFIRM' does not match VPS_IP secret. Aborting."
+            exit 1
+          fi
+          echo "Confirmed. Target: $EXPECTED"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Set up SSH key for root@VPS
+        env:
+          KEY: ${{ secrets.VPS_ROOT_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          umask 077
+          printf '%s\n' "$KEY" > ~/.ssh/id_install
+          chmod 600 ~/.ssh/id_install
+          ssh-keyscan -H "${{ secrets.VPS_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Write Tailscale auth key for first-boot autoconnect
+        env:
+          AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          if [ -z "$AUTHKEY" ]; then
+            echo "::error::TAILSCALE_AUTHKEY secret is not set."
+            exit 1
+          fi
+          mkdir -p extra-files/var/lib
+          umask 077
+          printf '%s' "$AUTHKEY" > extra-files/var/lib/tailscale-authkey
+          chmod 400 extra-files/var/lib/tailscale-authkey
+
+      - name: Run nixos-anywhere
+        env:
+          SSH_OPTS: "-i ~/.ssh/id_install -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
+        run: |
+          nix run github:nix-community/nixos-anywhere -- \
+            --flake .#default \
+            --extra-files extra-files \
+            --ssh-option "IdentityFile=$HOME/.ssh/id_install" \
+            --ssh-option "StrictHostKeyChecking=accept-new" \
+            root@${{ secrets.VPS_IP }}
+
+      - name: Done
+        run: |
+          echo "Install complete. Server will reboot and auto-join Tailscale."
+          echo "Verify on your laptop: tailscale status | grep <hostname>"

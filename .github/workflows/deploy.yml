@@ -1,0 +1,87 @@
+name: Deploy NixOS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "llm_wiki/**"
+      - "README.md"
+      - "LICENSE"
+      - ".gitignore"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: nixos-rebuild switch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Join Tailscale (ephemeral CI node)
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Read host details from config.nix
+        id: cfg
+        run: |
+          HOSTNAME=$(nix eval --raw .#nixosConfigurations.default.config.networking.hostName)
+          USERNAME=$(nix eval --raw --impure --expr '(import ./config.nix).username')
+          TAILNET=$(nix eval --raw --impure --expr '(import ./config.nix).tailnet')
+          echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
+          echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
+          echo "target=$USERNAME@$HOSTNAME.$TAILNET" >> "$GITHUB_OUTPUT"
+
+      - name: Set up deploy SSH key
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          umask 077
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Wait for target to be reachable over Tailscale
+        env:
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          for i in $(seq 1 30); do
+            if ssh -i ~/.ssh/id_deploy \
+                   -o StrictHostKeyChecking=accept-new \
+                   -o ConnectTimeout=5 \
+                   -o BatchMode=yes \
+                   "$TARGET" true 2>/dev/null; then
+              echo "Reachable."
+              exit 0
+            fi
+            echo "Attempt $i: not yet reachable, sleeping 5s..."
+            sleep 5
+          done
+          echo "::error::Could not reach $TARGET over Tailscale within 150s."
+          exit 1
+
+      - name: Deploy via nixos-rebuild
+        env:
+          TARGET: ${{ steps.cfg.outputs.target }}
+          NIX_SSHOPTS: "-i /home/runner/.ssh/id_deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/home/runner/.ssh/known_hosts"
+        run: |
+          nix run nixpkgs#nixos-rebuild -- switch \
+            --flake .#default \
+            --target-host "$TARGET" \
+            --use-remote-sudo
