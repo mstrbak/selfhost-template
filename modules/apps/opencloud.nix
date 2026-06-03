@@ -73,6 +73,10 @@ in
       OC_URL                = "https://cloud.${userConfig.domain}";
       OC_LOG_LEVEL          = "info";
       OC_INSECURE           = "false";
+      # Proxy listens plain HTTP on :9200 — Traefik in front terminates TLS.
+      # Without this, OpenCloud listens HTTPS with a self-signed cert and
+      # Traefik's HTTP backend call fails with "client sent HTTP to HTTPS server".
+      PROXY_TLS             = "false";
       # Admin identity — password supplied via env file.
       IDM_ADMIN_USERNAME    = "admin";
       IDM_CREATE_DEMO_USERS = "false";
