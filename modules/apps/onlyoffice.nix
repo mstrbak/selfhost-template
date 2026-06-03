@@ -38,6 +38,9 @@ in
       JWT_HEADER         = "Authorization";
       JWT_IN_BODY        = "true";
       USE_UNAUTHORIZED_STORAGE = "false";
+      # WOPI discovery endpoint (/hosting/discovery) only exists when WOPI mode
+      # is explicitly enabled. Required for OpenCloud's collaboration service.
+      WOPI_ENABLED       = "true";
     };
     # JWT_SECRET supplied via env file (reuses SERVICES_PASSWORD).
     environmentFiles = [ "/mnt/appdata/onlyoffice/env" ];
