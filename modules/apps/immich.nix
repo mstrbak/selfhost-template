@@ -21,7 +21,8 @@ in
     "d /mnt/appdata                          0755 root root - -"
     "d /mnt/appdata/immich                   0755 root root - -"
     "d /mnt/appdata/immich/db                0700 root root - -"
-    "d /mnt/appdata/immich/redis             0755 root root - -"
+    # Valkey image runs as UID 999 internally — needs write access for RDB snapshots.
+    "d /mnt/appdata/immich/redis             0700 999 999 - -"
     "d /mnt/appdata/immich/model-cache       0755 root root - -"
     # Immich derivative folders (thumbs, transcodes, profile pics, temp uploads, backups)
     "d /mnt/appdata/immich/thumbs            0755 root root - -"
