@@ -177,8 +177,8 @@ jobs:
             # Postgres reads POSTGRES_PASSWORD too — restart the DB container as well.
             ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-immich-postgres.service" || true
 
-            printf 'IDM_ADMIN_PASSWORD=%s\nCOLLABORATION_JWT_SECRET=%s\nCOLLABORATION_WOPI_SECRET=%s\n' \
-              "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
+            printf 'IDM_ADMIN_PASSWORD=%s\nOC_JWT_SECRET=%s\nCOLLABORATION_JWT_SECRET=%s\nCOLLABORATION_WOPI_SECRET=%s\n' \
+              "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
               push_secret /mnt/appdata/opencloud/env docker-opencloud.service
             # If first deploy, opencloud-init couldn't run (env was empty during
             # nixos-rebuild). Retry it now, then start the server container.
