@@ -16,6 +16,9 @@
     ../../modules/apps/immich.nix
     ../../modules/apps/opencloud.nix
     ../../modules/apps/onlyoffice.nix
+    ../../modules/apps/searxng.nix
+    ../../modules/apps/excalidraw.nix
+    ../../modules/apps/portainer.nix
   ];
 
   # Docker required for OCI containers.

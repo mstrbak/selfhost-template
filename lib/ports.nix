@@ -12,5 +12,8 @@
   immich      = 2283;  # conventional Immich port
   opencloud   = 9200;  # conventional OpenCloud port
   onlyoffice  = 8003;  # internal port we route to via Traefik
-  # Next free port: 8004
+  searxng     = 8004;
+  excalidraw  = 8005;
+  portainer   = 9000;
+  # Next free port: 8006
 }

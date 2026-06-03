@@ -312,6 +312,9 @@ Services served by this template:
 | `photos.<your-domain>` | Immich |
 | `cloud.<your-domain>` | OpenCloud |
 | `office.<your-domain>` | OnlyOffice (WOPI editor used by OpenCloud) |
+| `search.<your-domain>` | SearXNG (private metasearch) |
+| `draw.<your-domain>` | Excalidraw (whiteboard) |
+| `portainer.<your-domain>` | Portainer (Docker manager) |
 
 DNS: add an apex A record (for the dashboard) and a wildcard `*.<your-domain>` (for the rest), both pointing at the server's Tailscale IP, DNS-only (no Cloudflare proxy).
 

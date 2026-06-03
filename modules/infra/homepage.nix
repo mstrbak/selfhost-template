@@ -10,12 +10,16 @@ let
     layout:
       Productivity:
         style: row
-        columns: 3
+        columns: 4
         icon: mdi-briefcase-outline
       Media:
         style: row
         columns: 3
         icon: mdi-play-circle-outline
+      Tools:
+        style: row
+        columns: 3
+        icon: mdi-tools
       Infrastructure:
         style: row
         columns: 3
@@ -32,6 +36,14 @@ let
             href: https://cloud.${userConfig.domain}
             description: Files & collaboration
             icon: mdi-cloud-outline
+        - OnlyOffice:
+            href: https://office.${userConfig.domain}
+            description: Office editor (used by OpenCloud)
+            icon: mdi-file-document-edit-outline
+        - Excalidraw:
+            href: https://draw.${userConfig.domain}
+            description: Whiteboard & diagrams
+            icon: mdi-draw
 
     - Media:
         - Immich:
@@ -39,7 +51,17 @@ let
             description: Photo library
             icon: immich.svg
 
+    - Tools:
+        - SearXNG:
+            href: https://search.${userConfig.domain}
+            description: Private metasearch
+            icon: searxng.svg
+
     - Infrastructure:
+        - Portainer:
+            href: https://portainer.${userConfig.domain}
+            description: Docker container manager
+            icon: portainer.svg
         - Traefik:
             href: https://${userConfig.domain}
             description: Reverse proxy (this host)
@@ -53,6 +75,11 @@ let
           dateStyle: long
           timeStyle: short
           hour12: false
+    - search:
+        provider: custom
+        url: https://search.${userConfig.domain}/search?q=
+        target: _blank
+        showSearchSuggestions: false
     - resources:
         backend: resources
         expanded: true
