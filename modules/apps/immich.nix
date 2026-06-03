@@ -1,10 +1,10 @@
 { pkgs, userConfig, ports, ... }:
 let
   # Pin to a known-good release tag rather than `release` so deploys are reproducible.
-  serverImage   = "ghcr.io/immich-app/immich-server:v1.119.0";
-  mlImage       = "ghcr.io/immich-app/immich-machine-learning:v1.119.0";
-  postgresImage = "ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0";
-  redisImage    = "docker.io/valkey/valkey:8-bookworm";
+  serverImage   = "ghcr.io/immich-app/immich-server:v2.7.5";
+  mlImage       = "ghcr.io/immich-app/immich-machine-learning:v2.7.5";
+  postgresImage = "ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0";
+  redisImage    = "docker.io/valkey/valkey:9";
 
   # Internal DNS names within the `traefik` Docker network.
   dbHost     = "immich-postgres";

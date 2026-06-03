@@ -134,9 +134,12 @@ jobs:
           set -eu
           ssh_opts="-o StrictHostKeyChecking=accept-new -o BatchMode=yes"
 
+          # Reads env-file content from stdin so secrets with any character
+          # (quotes, $, !, backticks, etc.) survive without shell-escaping.
           push_secret() {
-            local path="$1" content="$2" service="$3"
-            local local_hash remote_hash
+            local path="$1" service="$2"
+            local content local_hash remote_hash
+            content=$(cat)
             local_hash=$(printf '%s' "$content" | sha256sum | awk '{print $1}')
             remote_hash=$(ssh $ssh_opts "$TARGET" \
               "sudo sha256sum '$path' 2>/dev/null | awk '{print \$1}'" || echo "")
@@ -149,37 +152,33 @@ jobs:
               return
             fi
             echo "  updating:  $path -> restart $service"
-            ssh $ssh_opts "$TARGET" "sudo install -m 400 -o root -g root /dev/null '$path' && sudo tee '$path' > /dev/null" <<< "$content"
+            printf '%s' "$content" | \
+              ssh $ssh_opts "$TARGET" "sudo install -m 400 -o root -g root /dev/null '$path' && sudo tee '$path' > /dev/null"
             ssh $ssh_opts "$TARGET" "sudo systemctl restart '$service'" || true
           }
 
           if [ -n "${CF_TOKEN:-}" ]; then
-            push_secret /var/lib/traefik/cf-token \
-              "CF_DNS_API_TOKEN=$CF_TOKEN" \
-              docker-traefik.service
+            printf 'CF_DNS_API_TOKEN=%s\n' "$CF_TOKEN" | \
+              push_secret /var/lib/traefik/cf-token docker-traefik.service
           else
             echo "CLOUDFLARE_DNS_API_TOKEN not set — skipping Traefik token push."
           fi
 
           if [ -n "${VW_TOKEN:-}" ]; then
-            push_secret /var/lib/vaultwarden/env \
-              "ADMIN_TOKEN=$VW_TOKEN" \
-              docker-vaultwarden.service
+            printf 'ADMIN_TOKEN=%s\n' "$VW_TOKEN" | \
+              push_secret /var/lib/vaultwarden/env docker-vaultwarden.service
           else
             echo "VAULTWARDEN_ADMIN_TOKEN not set — skipping Vaultwarden token push."
           fi
 
           if [ -n "${SERVICES_PASSWORD:-}" ]; then
-            push_secret /mnt/appdata/immich/env \
-              "DB_PASSWORD=$SERVICES_PASSWORD
-          POSTGRES_PASSWORD=$SERVICES_PASSWORD" \
-              docker-immich-server.service
+            printf 'DB_PASSWORD=%s\nPOSTGRES_PASSWORD=%s\n' "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
+              push_secret /mnt/appdata/immich/env docker-immich-server.service
             # Postgres reads POSTGRES_PASSWORD too — restart the DB container as well.
             ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-immich-postgres.service" || true
 
-            push_secret /mnt/appdata/opencloud/env \
-              "IDM_ADMIN_PASSWORD=$SERVICES_PASSWORD" \
-              docker-opencloud.service
+            printf 'IDM_ADMIN_PASSWORD=%s\n' "$SERVICES_PASSWORD" | \
+              push_secret /mnt/appdata/opencloud/env docker-opencloud.service
           else
             echo "SERVICES_PASSWORD not set — Immich + OpenCloud will fail to start."
           fi
