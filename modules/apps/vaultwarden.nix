@@ -20,14 +20,14 @@
     extraOptions = [
       "--network=traefik"
       "--label=traefik.enable=true"
-      "--label=traefik.http.routers.vaultwarden.rule=Host(`vault.${userConfig.domain}`)"
+      "--label=traefik.http.routers.vaultwarden.rule=Host(`pwdman.${userConfig.domain}`)"
       "--label=traefik.http.routers.vaultwarden.entrypoints=websecure"
       "--label=traefik.http.routers.vaultwarden.tls=true"
       "--label=traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt"
       "--label=traefik.http.services.vaultwarden.loadbalancer.server.port=${toString ports.vaultwarden}"
     ];
     environment = {
-      DOMAIN = "https://vault.${userConfig.domain}";
+      DOMAIN = "https://pwdman.${userConfig.domain}";
       ROCKET_PORT = toString ports.vaultwarden;
       SIGNUPS_ALLOWED = "false";
     };

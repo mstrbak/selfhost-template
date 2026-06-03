@@ -37,7 +37,7 @@ let
         exposedByDefault: false
         network: traefik
       file:
-        directory: /etc/traefik/dynamic
+        directory: /traefik-dynamic
         watch: true
 
     log:
@@ -62,13 +62,14 @@ in
   # the file as an empty placeholder so Traefik can start; replace contents
   # via SSH after first deploy.
   systemd.tmpfiles.rules = [
-    "d /var/lib/traefik           0750 root root - -"
+    "d /var/lib/traefik             0750 root root - -"
     "d /var/lib/traefik/letsencrypt 0700 root root - -"
-    "d /etc/traefik/dynamic       0755 root root - -"
-    "f /var/lib/traefik/cf-token  0400 root root - -"
+    "d /var/lib/traefik/dynamic     0755 root root - -"
+    "f /var/lib/traefik/cf-token    0400 root root - -"
+    # Copy dynamic config from /nix/store into a writable real directory so
+    # the Docker bind-mount and Traefik's inotify file watcher both work.
+    "C+ /var/lib/traefik/dynamic/wildcard.yml 0644 root root - ${dynamicWildcardYml}"
   ];
-
-  environment.etc."traefik/dynamic/wildcard.yml".source = dynamicWildcardYml;
 
   # Each container that joins the `traefik` Docker network must declare
   # `after`/`requires` on this oneshot. See modules/infra/homepage.nix and
@@ -109,7 +110,7 @@ in
     environmentFiles = [ "/var/lib/traefik/cf-token" ];
     volumes = [
       "${traefikYml}:/etc/traefik/traefik.yml:ro"
-      "/etc/traefik/dynamic:/etc/traefik/dynamic:ro"
+      "/var/lib/traefik/dynamic:/traefik-dynamic:ro"
       "/var/lib/traefik/letsencrypt:/letsencrypt"
       "/var/run/docker.sock:/var/run/docker.sock:ro"
     ];
