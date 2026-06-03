@@ -5,6 +5,12 @@
     "d /var/lib/homepage/config  0755 root root - -"
   ];
 
+  # Joins the `traefik` Docker network — wait for create-traefik-network.
+  systemd.services.docker-homepage = {
+    after    = [ "create-traefik-network.service" ];
+    requires = [ "create-traefik-network.service" ];
+  };
+
   virtualisation.oci-containers.containers.homepage = {
     image = "ghcr.io/gethomepage/homepage:latest";
     autoStart = true;

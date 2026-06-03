@@ -70,17 +70,30 @@ in
 
   environment.etc."traefik/dynamic/wildcard.yml".source = dynamicWildcardYml;
 
+  # Each container that joins the `traefik` Docker network must declare
+  # `after`/`requires` on this oneshot. See modules/infra/homepage.nix and
+  # modules/apps/vaultwarden.nix for the pattern.
   systemd.services.create-traefik-network = {
     description = "Create Docker network for Traefik";
     wantedBy = [ "multi-user.target" ];
-    after  = [ "docker.service" ];
+    after    = [ "docker.service" ];
     requires = [ "docker.service" ];
-    before = [ "docker-traefik.service" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.docker}/bin/docker network create traefik || true";
     };
+    # systemd ExecStart does not interpret shell — use `script` for idempotent create.
+    script = ''
+      if ! ${pkgs.docker}/bin/docker network inspect traefik >/dev/null 2>&1; then
+        ${pkgs.docker}/bin/docker network create traefik
+      fi
+    '';
+  };
+
+  # Traefik itself joins the network.
+  systemd.services.docker-traefik = {
+    after    = [ "create-traefik-network.service" ];
+    requires = [ "create-traefik-network.service" ];
   };
 
   virtualisation.oci-containers.containers.traefik = {

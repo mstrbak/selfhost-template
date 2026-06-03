@@ -8,6 +8,12 @@
     "f /var/lib/vaultwarden/env    0400 root root - -"
   ];
 
+  # Joins the `traefik` Docker network — wait for create-traefik-network.
+  systemd.services.docker-vaultwarden = {
+    after    = [ "create-traefik-network.service" ];
+    requires = [ "create-traefik-network.service" ];
+  };
+
   virtualisation.oci-containers.containers.vaultwarden = {
     image = "vaultwarden/server:latest";
     autoStart = true;
