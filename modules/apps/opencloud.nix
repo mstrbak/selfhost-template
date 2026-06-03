@@ -1,6 +1,47 @@
 { pkgs, userConfig, ports, ... }:
 let
   image = "opencloudeu/opencloud-rolling:latest";
+
+  # Extends OpenCloud's default Content-Security-Policy so the WOPI editor
+  # (OnlyOffice on office.<domain>) can be embedded as an iframe.
+  # Reference for csp.yaml structure + ocis setup:
+  #   https://thomaswildetech.com/blog/2025/04/23/setting-up-owncloud-infinite-scale-ocis/
+  cspYaml = pkgs.writeText "csp.yaml" ''
+    directives:
+      child-src:
+        - 'self'
+      connect-src:
+        - 'self'
+      default-src:
+        - 'none'
+      font-src:
+        - 'self'
+      frame-ancestors:
+        - 'self'
+      frame-src:
+        - 'self'
+        - blob:
+        - https://embed.diagrams.net/
+        - https://office.${userConfig.domain}
+      img-src:
+        - 'self'
+        - data:
+        - blob:
+      manifest-src:
+        - 'self'
+      media-src:
+        - 'self'
+      object-src:
+        - 'self'
+        - blob:
+      script-src:
+        - 'self'
+        - 'unsafe-inline'
+        - 'unsafe-eval'
+      style-src:
+        - 'self'
+        - 'unsafe-inline'
+  '';
 in
 {
   systemd.tmpfiles.rules = [
@@ -113,6 +154,8 @@ in
       # For single-binary deploy with one external URL we reuse OC_URL.
       COLLABORATION_WOPI_SRC          = "https://cloud.${userConfig.domain}";
       COLLABORATION_CS3API_DATAGATEWAY_INSECURE = "false";
+      # Custom CSP file extending frame-src to include OnlyOffice.
+      PROXY_CSP_CONFIG_FILE_LOCATION = "/var/lib/opencloud/csp.yaml";
       # JWT secret to talk to OnlyOffice — same as OnlyOffice's JWT_SECRET.
       # Supplied to OpenCloud via env file (reuses SERVICES_PASSWORD).
     };
@@ -122,6 +165,8 @@ in
       "/mnt/appdata/opencloud/data:/var/lib/opencloud"
       # OpenCloud reads/writes user data on shared storage (Immich also uses this).
       "/mnt/storage:/mnt/storage"
+      # Custom CSP file (Nix-generated, read-only).
+      "${cspYaml}:/var/lib/opencloud/csp.yaml:ro"
     ];
   };
 }
