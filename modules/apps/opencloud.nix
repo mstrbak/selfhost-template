@@ -20,20 +20,20 @@ let
         - 'self'
       frame-src:
         - 'self'
-        - blob:
+        - 'blob:'
         - https://embed.diagrams.net/
         - https://office.${userConfig.domain}
       img-src:
         - 'self'
-        - data:
-        - blob:
+        - 'data:'
+        - 'blob:'
       manifest-src:
         - 'self'
       media-src:
         - 'self'
       object-src:
         - 'self'
-        - blob:
+        - 'blob:'
       script-src:
         - 'self'
         - 'unsafe-inline'
