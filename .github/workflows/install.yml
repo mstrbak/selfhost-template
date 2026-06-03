@@ -69,6 +69,13 @@ jobs:
           }
           EOF
           chmod 600 config.local.nix
+          # Flakes only evaluate files known to git. Force-add and commit the
+          # (gitignored) local config so the flake can read it. This commit
+          # lives only on the runner — it is never pushed to the remote.
+          git config user.email "actions@github.local"
+          git config user.name  "github-actions"
+          git add -f config.local.nix
+          git commit -m "[runner only] inject secrets via config.local.nix"
 
       - name: Validate VPS_ROOT_PASSWORD secret
         env:
