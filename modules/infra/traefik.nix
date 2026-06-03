@@ -106,6 +106,14 @@ in
       # tailscale0 is trusted, so only tailnet clients can reach Traefik.
       "--publish=${toString ports.traefikHttp}:80"
       "--publish=${toString ports.traefikHttps}:443"
+      # Network aliases so other containers on the `traefik` network can
+      # reach Traefik by the public hostname they expect. Solves the
+      # "OpenCloud proxy verifies its own OIDC issuer URL" routing loop.
+      "--network-alias=${userConfig.domain}"
+      "--network-alias=home.${userConfig.domain}"
+      "--network-alias=pwdman.${userConfig.domain}"
+      "--network-alias=photos.${userConfig.domain}"
+      "--network-alias=cloud.${userConfig.domain}"
     ];
     environmentFiles = [ "/var/lib/traefik/cf-token" ];
     volumes = [

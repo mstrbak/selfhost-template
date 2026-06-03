@@ -59,11 +59,10 @@ in
     extraOptions = [
       "--network=traefik"
       # OpenCloud's proxy fetches its OWN /.well-known/openid-configuration
-      # at the public URL to verify access tokens. Without this mapping,
-      # the lookup leaves the container, goes out via Tailscale, comes back
-      # through Traefik, and times out. `host-gateway` makes the public host
-      # resolve to the docker host so the loop completes locally.
-      "--add-host=cloud.${userConfig.domain}:host-gateway"
+      # at the public URL to verify access tokens. Traefik claims a
+      # `--network-alias=cloud.<domain>` so Docker's embedded DNS resolves
+      # the public hostname to Traefik's container IP within this network —
+      # avoiding the host-gateway loop through the docker0/iptables NAT.
       # Run as root inside the container so bind-mounted host dirs are
       # readable+writable regardless of host UID. Acceptable for a homelab
       # single-host setup.
