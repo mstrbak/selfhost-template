@@ -37,7 +37,9 @@ in
         echo "OpenCloud env file empty; deferring init until secrets pushed."
         exit 0
       fi
-      ${pkgs.docker}/bin/docker run --rm \
+      # `opencloud init` prompts interactively for "insecure mode?" — answer no.
+      # `-i` attaches stdin so the piped "no" reaches the binary.
+      printf 'no\n' | ${pkgs.docker}/bin/docker run --rm -i \
         --user=0:0 \
         -v /mnt/appdata/opencloud/config:/etc/opencloud \
         --env-file /mnt/appdata/opencloud/env \
