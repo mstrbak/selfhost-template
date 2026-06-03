@@ -154,6 +154,9 @@ in
       # For single-binary deploy with one external URL we reuse OC_URL.
       COLLABORATION_WOPI_SRC          = "https://cloud.${userConfig.domain}";
       COLLABORATION_CS3API_DATAGATEWAY_INSECURE = "false";
+      # OnlyOffice doesn't ship the proof key by default — disable check or
+      # OpenCloud's collaboration service rejects every callback as "untrusted".
+      COLLABORATION_APP_PROOF_DISABLE = "true";
       # Custom CSP file extending frame-src to include OnlyOffice.
       PROXY_CSP_CONFIG_FILE_LOCATION = "/var/lib/opencloud/csp.yaml";
       # JWT secret to talk to OnlyOffice — same as OnlyOffice's JWT_SECRET.
