@@ -17,7 +17,7 @@
     extraOptions = [
       "--network=traefik"
       "--label=traefik.enable=true"
-      "--label=traefik.http.routers.homepage.rule=Host(`home.${userConfig.domain}`)"
+      "--label=traefik.http.routers.homepage.rule=Host(`${userConfig.domain}`)"
       "--label=traefik.http.routers.homepage.entrypoints=websecure"
       "--label=traefik.http.routers.homepage.tls=true"
       "--label=traefik.http.routers.homepage.tls.certresolver=letsencrypt"
@@ -25,7 +25,7 @@
     ];
     environment = {
       PORT = toString ports.homepage;
-      HOMEPAGE_ALLOWED_HOSTS = "home.${userConfig.domain}";
+      HOMEPAGE_ALLOWED_HOSTS = userConfig.domain;
     };
     volumes = [
       "/var/lib/homepage/config:/app/config"

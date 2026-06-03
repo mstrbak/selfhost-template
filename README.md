@@ -302,7 +302,7 @@ Do this **before your first deploy**.
 
 ### 10. Point your domain at the Tailscale IP
 
-The services (homepage, Vaultwarden) will be served at `home.<your-domain>` and `pwdman.<your-domain>` (note: `pwdman`, not `vault` — Chrome's anti-phishing flags the latter as a Bitwarden lookalike). You need a wildcard DNS record pointing at the server's Tailscale IP.
+The homepage dashboard is served at the apex `<your-domain>`. Vaultwarden at `pwdman.<your-domain>` (note: `pwdman`, not `vault` — Chrome anti-phishing flags the latter as a Bitwarden lookalike). You need both an apex A record and a wildcard pointing at the server's Tailscale IP.
 
 #### 10a. Find the server's Tailscale IP
 
