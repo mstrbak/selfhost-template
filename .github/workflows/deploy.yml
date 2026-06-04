@@ -177,13 +177,11 @@ jobs:
             # Postgres reads POSTGRES_PASSWORD too — restart the DB container as well.
             ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-immich-postgres.service" || true
 
-            printf 'IDM_ADMIN_PASSWORD=%s\nOC_JWT_SECRET=%s\nCOLLABORATION_JWT_SECRET=%s\nCOLLABORATION_WOPI_SECRET=%s\n' \
-              "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
-              push_secret /mnt/appdata/opencloud/env docker-opencloud.service
-            # If first deploy, opencloud-init couldn't run (env was empty during
-            # nixos-rebuild). Retry it now, then start the server container.
-            ssh $ssh_opts "$TARGET" "sudo systemctl restart opencloud-init.service" || true
-            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-opencloud.service" || true
+            # Nextcloud — MariaDB + admin password share SERVICES_PASSWORD.
+            printf 'MYSQL_ROOT_PASSWORD=%s\nMYSQL_PASSWORD=%s\nNEXTCLOUD_ADMIN_PASSWORD=%s\n' \
+              "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
+              push_secret /mnt/appdata/nextcloud/env docker-nextcloud.service
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-nextcloud-db.service" || true
 
             # OnlyOffice JWT_SECRET — reusing SERVICES_PASSWORD; rotate the
             # whole secret to invalidate sessions if compromised.

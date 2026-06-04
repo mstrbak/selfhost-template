@@ -14,11 +14,14 @@
     # apps
     ../../modules/apps/vaultwarden.nix
     ../../modules/apps/immich.nix
-    ../../modules/apps/opencloud.nix
+    # ../../modules/apps/opencloud.nix    # switched to Nextcloud
+    ../../modules/apps/nextcloud.nix
     ../../modules/apps/onlyoffice.nix
     ../../modules/apps/searxng.nix
     ../../modules/apps/excalidraw.nix
     ../../modules/apps/portainer.nix
+    ../../modules/apps/ittools.nix
+    ../../modules/apps/stirling-pdf.nix
   ];
 
   # Docker required for OCI containers.

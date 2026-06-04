@@ -15,5 +15,7 @@
   searxng     = 8004;
   excalidraw  = 8005;
   portainer   = 9000;
-  # Next free port: 8006
+  ittools     = 8006;
+  stirlingPdf = 8007;
+  # Next free port: 8008
 }

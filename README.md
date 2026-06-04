@@ -310,11 +310,13 @@ Services served by this template:
 | `<your-domain>` | Homepage dashboard |
 | `pwdman.<your-domain>` | Vaultwarden (note: `pwdman` not `vault` — Chrome anti-phishing flags Bitwarden lookalikes) |
 | `photos.<your-domain>` | Immich |
-| `cloud.<your-domain>` | OpenCloud |
+| `cloud.<your-domain>` | Nextcloud |
 | `office.<your-domain>` | OnlyOffice (WOPI editor used by OpenCloud) |
 | `search.<your-domain>` | SearXNG (private metasearch) |
 | `draw.<your-domain>` | Excalidraw (whiteboard) |
 | `portainer.<your-domain>` | Portainer (Docker manager) |
+| `tools.<your-domain>` | IT Tools (developer utilities) |
+| `pdf.<your-domain>` | Stirling-PDF (PDF tools) |
 
 DNS: add an apex A record (for the dashboard) and a wildcard `*.<your-domain>` (for the rest), both pointing at the server's Tailscale IP, DNS-only (no Cloudflare proxy).
 

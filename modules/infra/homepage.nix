@@ -32,10 +32,10 @@ let
             href: https://pwdman.${userConfig.domain}
             description: Password manager
             icon: bitwarden.svg
-        - OpenCloud:
+        - Nextcloud:
             href: https://cloud.${userConfig.domain}
             description: Files & collaboration
-            icon: mdi-cloud-outline
+            icon: nextcloud.svg
         - OnlyOffice:
             href: https://office.${userConfig.domain}
             description: Office editor (used by OpenCloud)
@@ -56,6 +56,14 @@ let
             href: https://search.${userConfig.domain}
             description: Private metasearch
             icon: searxng.svg
+        - IT Tools:
+            href: https://tools.${userConfig.domain}
+            description: Developer utilities
+            icon: it-tools.svg
+        - Stirling PDF:
+            href: https://pdf.${userConfig.domain}
+            description: PDF manipulation
+            icon: stirling-pdf.svg
 
     - Infrastructure:
         - Portainer:
