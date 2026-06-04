@@ -80,7 +80,10 @@ in
         "--label=traefik.http.middlewares.nc-dav.redirectregex.permanent=true"
         "--label=traefik.http.middlewares.nc-dav.redirectregex.regex=https?://([^/]+)/.well-known/(card|cal)dav"
         "--label=traefik.http.middlewares.nc-dav.redirectregex.replacement=https://$${1}/remote.php/dav/"
-        "--label=traefik.http.routers.nextcloud.middlewares=nc-dav@docker"
+        # Auto-upgrade mixed-content requests (OnlyOffice generates http://
+        # URLs in WOPI responses; this CSP makes browsers retry over https).
+        "--label=traefik.http.middlewares.nc-upgrade.headers.contentSecurityPolicy=upgrade-insecure-requests"
+        "--label=traefik.http.routers.nextcloud.middlewares=nc-dav@docker,nc-upgrade@docker"
       ];
       environment = {
         MYSQL_HOST                 = dbHost;
