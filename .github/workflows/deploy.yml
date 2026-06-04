@@ -183,6 +183,16 @@ jobs:
               push_secret /mnt/appdata/nextcloud/env docker-nextcloud.service
             ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-nextcloud-db.service" || true
 
+            # Penpot — DB + Redis password + secret key share SERVICES_PASSWORD.
+            # SECRET_KEY is used to sign cookies/JWTs; rotating SERVICES_PASSWORD
+            # invalidates existing sessions.
+            printf 'POSTGRES_PASSWORD=%s\nPENPOT_DATABASE_PASSWORD=%s\nPENPOT_SECRET_KEY=%s\n' \
+              "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" "$SERVICES_PASSWORD" | \
+              push_secret /mnt/appdata/penpot/env docker-penpot-backend.service
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-penpot-postgres.service" || true
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-penpot-exporter.service" || true
+            ssh $ssh_opts "$TARGET" "sudo systemctl restart docker-penpot-frontend.service" || true
+
             # OnlyOffice JWT_SECRET — reusing SERVICES_PASSWORD; rotate the
             # whole secret to invalidate sessions if compromised.
             printf 'JWT_SECRET=%s\n' "$SERVICES_PASSWORD" | \

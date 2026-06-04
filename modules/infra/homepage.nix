@@ -44,6 +44,10 @@ let
             href: https://draw.${userConfig.domain}
             description: Whiteboard & diagrams
             icon: mdi-draw
+        - Penpot:
+            href: https://design.${userConfig.domain}
+            description: Design & prototyping
+            icon: penpot.svg
 
     - Media:
         - Immich:

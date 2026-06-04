@@ -22,6 +22,7 @@
     ../../modules/apps/portainer.nix
     ../../modules/apps/ittools.nix
     ../../modules/apps/stirling-pdf.nix
+    ../../modules/apps/penpot.nix
   ];
 
   # Docker required for OCI containers.

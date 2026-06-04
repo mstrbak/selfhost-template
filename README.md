@@ -317,6 +317,7 @@ Services served by this template:
 | `portainer.<your-domain>` | Portainer (Docker manager) |
 | `tools.<your-domain>` | IT Tools (developer utilities) |
 | `pdf.<your-domain>` | Stirling-PDF (PDF tools) |
+| `design.<your-domain>` | Penpot (design & prototyping) |
 
 DNS: add an apex A record (for the dashboard) and a wildcard `*.<your-domain>` (for the rest), both pointing at the server's Tailscale IP, DNS-only (no Cloudflare proxy).
 

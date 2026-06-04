@@ -17,5 +17,6 @@
   portainer   = 9000;
   ittools     = 8006;
   stirlingPdf = 8007;
-  # Next free port: 8008
+  penpot      = 8008;
+  # Next free port: 8009
 }
