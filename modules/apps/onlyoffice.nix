@@ -1,6 +1,9 @@
 { pkgs, userConfig, ports, ... }:
 let
-  image = "onlyoffice/documentserver:latest";
+  # 9.4.0 has a missing Analytics.js asset that breaks the editor service worker
+  # (404 cascades into "promise rejected" → UI never finishes loading).
+  # Pin to a known-stable older release until upstream fixes it.
+  image = "onlyoffice/documentserver:8.3.3";
 in
 {
   systemd.tmpfiles.rules = [
