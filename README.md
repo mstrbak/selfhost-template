@@ -151,7 +151,7 @@ Open <https://login.tailscale.com/admin/settings/oauth>. Click **Generate OAuth 
 
 - **Description**: e.g. "GitHub Actions deploy"
 - **Scopes**: check `Keys > Auth Keys > Write` and `Devices > Core > Write` (this is what `devices:write` means in the Tailscale docs)
-- **Tags**: select `tag:ci`
+- **Tags**: select `tag:ci` for both scopes
 
 Click **Generate client**. You'll see a **Client ID** and a **Client secret**. Copy both — the secret is shown only once. These go into the `TAILSCALE_OAUTH_CLIENT_ID` and `TAILSCALE_OAUTH_SECRET` GitHub secrets.
 
